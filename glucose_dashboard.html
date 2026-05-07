@@ -982,7 +982,16 @@ function processData(rows, fileName) {
   const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
   const color = USER_COLORS[users.length % USER_COLORS.length];
   const name = fileName.replace(/\.csv$/i, '');
-  users.push({ id, name, color, data: parsed });
+  users.push({
+    id, name, color, data: parsed,
+    filters: {
+      range: '7d',
+      dateFrom: toInputDate(parsed[0].datetime),
+      dateTo: toInputDate(parsed[parsed.length - 1].datetime),
+      tod: 'all',
+      alert: 'all',
+    }
+  });
 
   // Reveal dashboard on first user
   if (users.length === 1) {
@@ -996,16 +1005,37 @@ function processData(rows, fileName) {
   setActiveUser(id);
 }
 
+function readFiltersFromUI() {
+  return {
+    range:    document.getElementById('range-select').value,
+    dateFrom: document.getElementById('date-from').value,
+    dateTo:   document.getElementById('date-to').value,
+    tod:      document.getElementById('tod-select').value,
+    alert:    document.getElementById('alert-filter').value,
+  };
+}
+
+function writeFiltersToUI(f) {
+  document.getElementById('range-select').value = f.range;
+  document.getElementById('date-from').value    = f.dateFrom;
+  document.getElementById('date-to').value      = f.dateTo;
+  document.getElementById('tod-select').value   = f.tod;
+  document.getElementById('alert-filter').value = f.alert;
+  document.getElementById('custom-range').style.display = f.range === 'custom' ? 'flex' : 'none';
+}
+
 function setActiveUser(id) {
+  // Persist current filter state to the departing user
+  if (activeUserId) {
+    const outgoing = users.find(u => u.id === activeUserId);
+    if (outgoing) outgoing.filters = readFiltersFromUI();
+  }
+
   activeUserId = id;
   const user = users.find(u => u.id === id);
   allData = user.data;
 
-  const first = allData[0].datetime;
-  const last  = allData[allData.length - 1].datetime;
-  document.getElementById('date-from').value = toInputDate(first);
-  document.getElementById('date-to').value   = toInputDate(last);
-
+  writeFiltersToUI(user.filters);
   renderUserTabs();
   applyFilters();
 }
