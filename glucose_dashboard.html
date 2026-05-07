@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GlucoView — Personal CGM Dashboard</title>
+
+<!-- CDN Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #0b0f1a;
+  --surface: #111827;
+  --surface2: #1a2236;
+  --border: #1e2d45;
+  --text: #e8edf5;
+  --muted: #6b7fa3;
+  --accent: #3b82f6;
+  --accent2: #06b6d4;
+  --green: #10b981;
+  --red: #ef4444;
+  --orange: #f59e0b;
+  --low: #ef4444;
+  --normal: #10b981;
+  --high: #f97316;
+  --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --font-mono: 'DM Mono', monospace;
+  --font-sans: 'Sora', sans-serif;
+  --radius: 12px;
+  --transition: 0.2s ease;
+}
+
+[data-theme="light"] {
+  --bg: #f0f4fa;
+  --surface: #ffffff;
+  --surface2: #e8eef8;
+  --border: #d0daea;
+  --text: #111827;
+  --muted: #5a6a8a;
+  --card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background var(--transition), color var(--transition);
+  font-size: 14px;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+
+.logo-text {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.logo-text span { color: var(--accent2); }
+
+header nav {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: #2563eb; color: #fff; border-color: #2563eb; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-ghost { background: transparent; border-color: transparent; }
+.btn-ghost:hover { background: var(--surface2); }
+
+/* ── MAIN LAYOUT ── */
+main { max-width: 1400px; margin: 0 auto; padding: 28px 24px 48px; }
+
+/* ── UPLOAD ZONE ── */
+#upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 120px);
+  gap: 24px;
+}
+
+.upload-zone {
+  width: 100%;
+  max-width: 560px;
+  border: 2px dashed var(--border);
+  border-radius: 20px;
+  padding: 60px 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  background: var(--surface);
+  position: relative;
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--surface2);
+  transform: scale(1.01);
+}
+
+.upload-icon {
+  font-size: 52px;
+  margin-bottom: 16px;
+  display: block;
+  filter: drop-shadow(0 0 20px var(--accent));
+}
+
+.upload-zone h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+.upload-zone p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.upload-zone input[type="file"] { display: none; }
+
+.upload-hint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  max-width: 560px;
+  width: 100%;
+  text-align: left;
+  line-height: 1.8;
+}
+
+.upload-hint strong { color: var(--accent2); }
+
+/* ── DASHBOARD ── */
+#dashboard { display: none; }
+
+/* ── ALERT BANNER ── */
+.alert-banner {
+  display: none;
+  background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05));
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.alert-banner .alert-icon { font-size: 20px; }
+.alert-banner strong { color: var(--red); }
+
+/* ── CONTROLS BAR ── */
+.controls-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.controls-bar label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+select, input[type="date"] {
+  padding: 7px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+select:focus, input[type="date"]:focus { border-color: var(--accent); }
+
+.controls-divider {
+  width: 1px; height: 28px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.filter-group { display: flex; align-items: center; gap: 8px; }
+
+/* ── METRIC CARDS ── */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.metric-card:hover { transform: translateY(-2px); box-shadow: var(--card-shadow); }
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+
+.metric-card.card-green::before { background: linear-gradient(90deg, var(--green), #34d399); }
+.metric-card.card-red::before { background: linear-gradient(90deg, var(--red), #f87171); }
+.metric-card.card-orange::before { background: linear-gradient(90deg, var(--orange), #fcd34d); }
+
+.metric-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.metric-value {
+  font-size: 36px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  line-height: 1;
+  margin-bottom: 4px;
+  letter-spacing: -1px;
+}
+
+.metric-unit { font-size: 14px; color: var(--muted); font-weight: 400; }
+.metric-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.metric-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  margin-top: 6px;
+}
+.badge-green { background: rgba(16,185,129,0.15); color: var(--green); }
+.badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+.badge-orange { background: rgba(245,158,11,0.15); color: var(--orange); }
+.badge-blue { background: rgba(59,130,246,0.15); color: var(--accent); }
+
+/* ── BONUS CARDS ── */
+.bonus-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.bonus-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.bonus-card h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.day-list { display: flex; flex-direction: column; gap: 6px; }
+
+.day-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.day-row .day-name { font-family: var(--font-mono); color: var(--muted); }
+.day-row .day-val { font-weight: 600; font-family: var(--font-mono); }
+
+.a1c-display {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.a1c-value {
+  font-size: 48px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: -2px;
+  line-height: 1;
+}
+
+.a1c-label { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.a1c-formula { font-size: 11px; color: var(--muted); margin-top: 8px; font-family: var(--font-mono); }
+
+/* ── CHART SECTIONS ── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  position: relative;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chart-subtitle { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.chart-actions { display: flex; gap: 6px; }
+
+.chart-container { position: relative; }
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── TABLE ── */
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.table-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.table-controls h3 { font-size: 14px; font-weight: 600; }
+
+.search-box {
+  padding: 7px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  outline: none;
+  width: 220px;
+  transition: border-color var(--transition);
+}
+
+.search-box:focus { border-color: var(--accent); }
+
+.table-wrapper { overflow-x: auto; max-height: 380px; overflow-y: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead { position: sticky; top: 0; z-index: 2; background: var(--surface2); }
+
+th {
+  padding: 11px 16px;
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+th:hover { color: var(--accent); }
+
+th .sort-icon { margin-left: 4px; opacity: 0.4; }
+th.sort-asc .sort-icon::after { content: ' ↑'; opacity: 1; color: var(--accent); }
+th.sort-desc .sort-icon::after { content: ' ↓'; opacity: 1; color: var(--accent); }
+
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+tr:last-child td { border-bottom: none; }
+
+tr.row-low { background: rgba(239,68,68,0.07); }
+tr.row-low td.val-cell { color: var(--red); font-weight: 600; }
+tr.row-high { background: rgba(249,115,22,0.05); }
+tr.row-high td.val-cell { color: var(--high); font-weight: 600; }
+
+tr:hover td { background: var(--surface2); }
+tr.row-low:hover td { background: rgba(239,68,68,0.12); }
+
+.status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.pill-low { background: rgba(239,68,68,0.15); color: var(--red); }
+.pill-normal { background: rgba(16,185,129,0.12); color: var(--green); }
+.pill-high { background: rgba(249,115,22,0.12); color: var(--high); }
+
+.table-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+/* ── LOADING ── */
+#loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.loading-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 40px;
+  text-align: center;
+}
+
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .bonus-grid { grid-template-columns: 1fr; }
+  .charts-row { grid-template-columns: 1fr; }
+  header { padding: 14px 16px; }
+  main { padding: 16px 12px 40px; }
+  .controls-bar { padding: 12px 14px; }
+  .metric-value { font-size: 28px; }
+}
+
+@media (max-width: 560px) {
+  .metrics-grid { grid-template-columns: 1fr 1fr; }
+  .logo-text { display: none; }
+  .controls-bar label { display: none; }
+}
+
+/* ── MISC ── */
+.section-spacer { height: 8px; }
+
+.file-info {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.file-info .file-name { color: var(--accent2); font-family: var(--font-mono); }
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Chart zoom hint */
+.zoom-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  opacity: 0.7;
+}
+
+/* Preview strip */
+.preview-strip {
+  display: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  max-width: 560px;
+  width: 100%;
+}
+
+.preview-row { padding: 2px 0; }
+.preview-row:first-child { color: var(--accent2); font-weight: 500; }
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- Loading Overlay -->
+<div id="loading-overlay">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div style="font-size:14px;color:var(--muted)">Parsing glucose data…</div>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🩸</div>
+    <div class="logo-text">Gluco<span>View</span></div>
+  </div>
+  <nav>
+    <div class="file-info" id="file-info">
+      <span>📄</span>
+      <span class="file-name" id="file-name-display">—</span>
+      <button class="btn btn-sm" onclick="resetDashboard()">✕ Remove</button>
+    </div>
+    <button class="btn btn-sm" id="export-csv-btn" style="display:none" onclick="exportCSV()">⬇ CSV</button>
+    <button class="btn btn-sm" id="export-excel-btn" style="display:none" onclick="exportExcel()">⬇ Excel</button>
+    <button class="btn btn-ghost btn-sm" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+  </nav>
+</header>
+
+<!-- Upload Section -->
+<div id="upload-section">
+  <div class="upload-zone" id="upload-zone" onclick="document.getElementById('csv-input').click()">
+    <span class="upload-icon">📊</span>
+    <h2>Drop your CGM export here</h2>
+    <p>Drag & drop a CSV file, or click to browse.<br>Your data never leaves your browser.</p>
+    <input type="file" id="csv-input" accept=".csv" onchange="handleFile(this.files[0])">
+  </div>
+
+  <div class="preview-strip" id="preview-strip"></div>
+
+  <div class="upload-hint">
+    <strong>Expected CSV columns:</strong><br>
+    Time of Glucose Reading [T=…] &nbsp;|&nbsp; Measurement(mg/dL)<br>
+    <strong>Example:</strong> 2026-01-17T13:31-04:00 &nbsp;|&nbsp; 115<br>
+    "Out of range" values are automatically excluded.
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+<main>
+
+  <!-- Alert Banner -->
+  <div class="alert-banner" id="alert-banner">
+    <span class="alert-icon">⚠️</span>
+    <div>
+      <strong>Hypoglycemic Events Detected</strong>
+      <span id="alert-text"> — readings below 70 mg/dL in this view.</span>
+    </div>
+    <button class="btn btn-sm" style="margin-left:auto" onclick="scrollToLowReadings()">View in table ↓</button>
+  </div>
+
+  <!-- Controls Bar -->
+  <div class="controls-bar">
+    <div class="filter-group">
+      <label>Range</label>
+      <select id="range-select" onchange="applyFilters()">
+        <option value="all">All Data</option>
+        <option value="24h">Last 24h</option>
+        <option value="7d" selected>Last 7 Days</option>
+        <option value="30d">Last 30 Days</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </div>
+    <div class="filter-group" id="custom-range" style="display:none">
+      <input type="date" id="date-from" onchange="applyFilters()">
+      <span style="color:var(--muted);font-size:12px">to</span>
+      <input type="date" id="date-to" onchange="applyFilters()">
+    </div>
+    <div class="controls-divider"></div>
+    <div class="filter-group">
+      <label>Time of Day</label>
+      <select id="tod-select" onchange="applyFilters()">
+        <option value="all">All Hours</option>
+        <option value="morning">Morning (6–12)</option>
+        <option value="afternoon">Afternoon (12–18)</option>
+        <option value="evening">Evening (18–24)</option>
+        <option value="night">Night (0–6)</option>
+      </select>
+    </div>
+    <div class="controls-divider"></div>
+    <div class="filter-group">
+      <label>Alerts</label>
+      <select id="alert-filter" onchange="applyFilters()">
+        <option value="all">Show All</option>
+        <option value="low">Low Only (&lt;70)</option>
+        <option value="high">High Only (&gt;180)</option>
+        <option value="normal">Normal Only</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Metric Cards -->
+  <div class="metrics-grid">
+    <div class="metric-card card-blue">
+      <div class="metric-label">Average Glucose</div>
+      <div class="metric-value" id="m-avg">—</div>
+      <div class="metric-unit">mg/dL</div>
+      <div class="metric-sub" id="m-tidr">—</div>
+    </div>
+    <div class="metric-card card-red">
+      <div class="metric-label">Minimum Reading</div>
+      <div class="metric-value" id="m-min">—</div>
+      <div class="metric-unit">mg/dL</div>
+      <div class="metric-sub" id="m-min-time">—</div>
+    </div>
+    <div class="metric-card card-orange">
+      <div class="metric-label">Maximum Reading</div>
+      <div class="metric-value" id="m-max">—</div>
+      <div class="metric-unit">mg/dL</div>
+      <div class="metric-sub" id="m-max-time">—</div>
+    </div>
+    <div class="metric-card card-green">
+      <div class="metric-label">Valid Readings</div>
+      <div class="metric-value" id="m-count">—</div>
+      <div class="metric-sub" id="m-hypo">—</div>
+      <div class="metric-sub" id="m-last">—</div>
+    </div>
+  </div>
+
+  <!-- Bonus Cards -->
+  <div class="bonus-grid">
+    <div class="bonus-card">
+      <h3>📐 Estimated A1C</h3>
+      <div class="a1c-display">
+        <div class="a1c-value" id="a1c-value">—</div>
+        <div class="a1c-label">%</div>
+        <div class="a1c-formula" id="a1c-formula">Formula: (avg + 46.7) / 28.7</div>
+        <div class="metric-badge badge-blue" id="a1c-badge" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <div class="bonus-card">
+      <h3>🏆 Best Days (Lowest Avg)</h3>
+      <div class="day-list" id="best-days"></div>
+    </div>
+    <div class="bonus-card">
+      <h3>⚡ Highest Days (Highest Avg)</h3>
+      <div class="day-list" id="worst-days"></div>
+    </div>
+  </div>
+
+  <!-- Line Chart -->
+  <div class="chart-card" style="margin-bottom:20px">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Glucose Timeline</div>
+        <div class="chart-subtitle">All readings with threshold reference lines</div>
+      </div>
+      <div class="chart-actions">
+        <button class="btn btn-sm" onclick="resetZoom()">⊞ Reset Zoom</button>
+        <button class="btn btn-sm" onclick="exportChart('line-chart')">📷 PNG</button>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div> Low (&lt;70)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Normal (70–180)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--high)"></div> High (&gt;180)</div>
+    </div>
+    <div class="chart-container">
+      <canvas id="line-chart" height="90"></canvas>
+    </div>
+    <div class="zoom-hint">🔍 Scroll to zoom · Click-drag to pan · Double-click to reset</div>
+  </div>
+
+  <!-- Bar Charts Row -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Hourly Pattern</div>
+          <div class="chart-subtitle">Average by hour of day</div>
+        </div>
+        <button class="btn btn-sm" onclick="exportChart('hourly-chart')">📷</button>
+      </div>
+      <canvas id="hourly-chart" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Daily Averages</div>
+          <div class="chart-subtitle">One bar per calendar day</div>
+        </div>
+        <button class="btn btn-sm" onclick="exportChart('daily-chart')">📷</button>
+      </div>
+      <canvas id="daily-chart" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Data Table -->
+  <div class="table-card">
+    <div class="table-controls">
+      <h3>📋 Reading Log <span id="table-count" style="color:var(--muted);font-weight:400;font-size:12px"></span></h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="search-box" type="text" id="table-search" placeholder="Search date or value…" oninput="renderTable()">
+        <select id="table-page-size" onchange="renderTable()" style="width:90px">
+          <option value="50">50 rows</option>
+          <option value="100">100 rows</option>
+          <option value="250">250 rows</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortTable('datetime')" id="th-datetime">Date &amp; Time <span class="sort-icon"></span></th>
+            <th onclick="sortTable('value')" id="th-value">Glucose (mg/dL) <span class="sort-icon"></span></th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span id="table-footer-info">—</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" id="prev-page" onclick="changePage(-1)">← Prev</button>
+        <span id="page-display" style="padding:5px 10px;font-size:12px;color:var(--muted)">1 / 1</span>
+        <button class="btn btn-sm" id="next-page" onclick="changePage(1)">Next →</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let allData = [];        // {datetime: Date, value: number}[]
+let filteredData = [];
+let sortCol = 'datetime';
+let sortDir = 'desc';
+let currentPage = 1;
+let lineChart, hourlyChart, dailyChart;
+
+// ════════════════════════════════════════════════
+// UPLOAD & PARSE
+// ════════════════════════════════════════════════
+const uploadZone = document.getElementById('upload-zone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+function handleFile(file) {
+  if (!file || !file.name.endsWith('.csv')) {
+    alert('Please upload a .csv file.');
+    return;
+  }
+  showLoading(true);
+  document.getElementById('file-name-display').textContent = file.name;
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      showLoading(false);
+      processData(results.data, file.name);
+    },
+    error: function(err) {
+      showLoading(false);
+      alert('Error parsing CSV: ' + err.message);
+    }
+  });
+}
+
+function processData(rows, fileName) {
+  allData = [];
+
+  // Detect column names flexibly
+  const sampleRow = rows[0] || {};
+  const keys = Object.keys(sampleRow);
+  const timeKey = keys.find(k => k.toLowerCase().includes('time') || k.toLowerCase().includes('date')) || keys[0];
+  const valKey  = keys.find(k => k.toLowerCase().includes('measure') || k.toLowerCase().includes('mg') || k.toLowerCase().includes('glucose')) || keys[1];
+
+  // Show preview
+  showPreview(rows.slice(0, 5), timeKey, valKey);
+
+  rows.forEach(row => {
+    const rawVal = row[valKey];
+    if (!rawVal || rawVal.toString().toLowerCase().includes('out of range') || rawVal.toString().toLowerCase() === 'low' || rawVal.toString().toLowerCase() === 'high') return;
+    const num = parseFloat(rawVal);
+    if (isNaN(num)) return;
+    const dt = new Date(row[timeKey]);
+    if (isNaN(dt.getTime())) return;
+    allData.push({ datetime: dt, value: num });
+  });
+
+  if (allData.length === 0) {
+    alert('No valid readings found. Check column names match expected format.');
+    return;
+  }
+
+  allData.sort((a, b) => a.datetime - b.datetime);
+
+  // Show dashboard
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('file-info').style.display = 'flex';
+  document.getElementById('export-csv-btn').style.display = 'inline-flex';
+  document.getElementById('export-excel-btn').style.display = 'inline-flex';
+
+  // Set default date range inputs
+  const first = allData[0].datetime;
+  const last  = allData[allData.length - 1].datetime;
+  document.getElementById('date-from').value = toInputDate(first);
+  document.getElementById('date-to').value   = toInputDate(last);
+
+  applyFilters();
+}
+
+function showPreview(rows, timeKey, valKey) {
+  const strip = document.getElementById('preview-strip');
+  strip.style.display = 'block';
+  strip.innerHTML = `<div class="preview-row">${timeKey} | ${valKey}</div>` +
+    rows.map(r => `<div class="preview-row">${r[timeKey] || '—'} | ${r[valKey] || '—'}</div>`).join('');
+}
+
+// ════════════════════════════════════════════════
+// FILTERING
+// ════════════════════════════════════════════════
+function applyFilters() {
+  const range    = document.getElementById('range-select').value;
+  const tod      = document.getElementById('tod-select').value;
+  const alertF   = document.getElementById('alert-filter').value;
+  const now      = new Date();
+
+  // Show/hide custom date inputs
+  document.getElementById('custom-range').style.display = range === 'custom' ? 'flex' : 'none';
+
+  let data = [...allData];
+
+  // Date range filter
+  if (range === '24h')   data = data.filter(d => d.datetime >= new Date(now - 24*3600*1000));
+  else if (range === '7d')  data = data.filter(d => d.datetime >= new Date(now - 7*24*3600*1000));
+  else if (range === '30d') data = data.filter(d => d.datetime >= new Date(now - 30*24*3600*1000));
+  else if (range === 'custom') {
+    const from = document.getElementById('date-from').value;
+    const to   = document.getElementById('date-to').value;
+    if (from) data = data.filter(d => d.datetime >= new Date(from));
+    if (to)   data = data.filter(d => d.datetime <= new Date(to + 'T23:59:59'));
+  }
+
+  // Time of day filter
+  if (tod !== 'all') {
+    const ranges = { morning: [6,12], afternoon: [12,18], evening: [18,24], night: [0,6] };
+    const [lo, hi] = ranges[tod];
+    data = data.filter(d => {
+      const h = d.datetime.getHours();
+      if (tod === 'night') return h >= 0 && h < 6;
+      return h >= lo && h < hi;
+    });
+  }
+
+  // Alert filter
+  if (alertF === 'low')    data = data.filter(d => d.value < 70);
+  else if (alertF === 'high')   data = data.filter(d => d.value > 180);
+  else if (alertF === 'normal') data = data.filter(d => d.value >= 70 && d.value <= 180);
+
+  filteredData = data;
+  currentPage = 1;
+
+  updateMetrics();
+  updateCharts();
+  renderTable();
+}
+
+// ════════════════════════════════════════════════
+// METRICS
+// ════════════════════════════════════════════════
+function updateMetrics() {
+  const data = filteredData;
+  if (!data.length) return;
+
+  const values = data.map(d => d.value);
+  const avg    = values.reduce((a, b) => a + b, 0) / values.length;
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const hypos  = data.filter(d => d.value < 70).length;
+  const highs  = data.filter(d => d.value > 180).length;
+
+  // TIR
+  const tir = (data.filter(d => d.value >= 70 && d.value <= 180).length / data.length * 100).toFixed(1);
+
+  el('m-avg').textContent = avg.toFixed(1);
+  el('m-tidr').innerHTML  = `<span class="metric-badge badge-green">TIR ${tir}%</span>`;
+  el('m-min').textContent = minVal;
+  const minRow = data.find(d => d.value === minVal);
+  el('m-min-time').textContent = minRow ? fmtDt(minRow.datetime) : '';
+  el('m-max').textContent = maxVal;
+  const maxRow = data.find(d => d.value === maxVal);
+  el('m-max-time').textContent = maxRow ? fmtDt(maxRow.datetime) : '';
+  el('m-count').textContent = data.length;
+  el('m-hypo').innerHTML = hypos > 0
+    ? `<span class="metric-badge badge-red">⚠ ${hypos} hypo event${hypos !== 1 ? 's' : ''}</span>`
+    : `<span class="metric-badge badge-green">✓ No hypo events</span>`;
+
+  // Time since last reading
+  const lastDt = data[data.length - 1].datetime;
+  const minsAgo = Math.round((Date.now() - lastDt.getTime()) / 60000);
+  const agoStr  = minsAgo < 60 ? `${minsAgo}m ago` : minsAgo < 1440 ? `${Math.round(minsAgo/60)}h ago` : `${Math.round(minsAgo/1440)}d ago`;
+  el('m-last').textContent = `Last reading: ${agoStr}`;
+
+  // Alert banner
+  const banner = document.getElementById('alert-banner');
+  if (hypos > 0) {
+    banner.style.display = 'flex';
+    el('alert-text').textContent = ` — ${hypos} reading${hypos !== 1 ? 's' : ''} below 70 mg/dL in this view.`;
+  } else {
+    banner.style.display = 'none';
+  }
+
+  // A1C (Nathan formula: A1C = (avg + 46.7) / 28.7)
+  const a1c = ((avg + 46.7) / 28.7).toFixed(1);
+  el('a1c-value').textContent = a1c;
+  el('a1c-formula').textContent = `avg ${avg.toFixed(1)} mg/dL → (avg + 46.7) / 28.7`;
+  let a1cClass = 'badge-green', a1cLabel = 'Normal';
+  if (parseFloat(a1c) >= 6.5) { a1cClass = 'badge-red'; a1cLabel = 'Diabetic range'; }
+  else if (parseFloat(a1c) >= 5.7) { a1cClass = 'badge-orange'; a1cLabel = 'Pre-diabetic range'; }
+  el('a1c-badge').className = `metric-badge ${a1cClass}`;
+  el('a1c-badge').textContent = a1cLabel;
+
+  // Best / worst days
+  updateDaySummaries(data);
+}
+
+function updateDaySummaries(data) {
+  const byDay = {};
+  data.forEach(d => {
+    const key = toInputDate(d.datetime);
+    if (!byDay[key]) byDay[key] = [];
+    byDay[key].push(d.value);
+  });
+
+  const dayAvgs = Object.entries(byDay).map(([day, vals]) => ({
+    day,
+    avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+    n: vals.length
+  })).filter(x => x.n >= 3);  // need at least 3 readings
+
+  dayAvgs.sort((a, b) => a.avg - b.avg);
+
+  const best  = dayAvgs.slice(0, 5);
+  const worst = [...dayAvgs].sort((a, b) => b.avg - a.avg).slice(0, 5);
+
+  function renderDays(days, containerId, isBest) {
+    const container = document.getElementById(containerId);
+    if (days.length === 0) { container.innerHTML = '<div style="color:var(--muted);font-size:12px">Not enough data</div>'; return; }
+    container.innerHTML = days.map((d, i) => {
+      const col = d.avg < 70 ? 'var(--red)' : d.avg > 180 ? 'var(--high)' : 'var(--green)';
+      return `<div class="day-row">
+        <span class="day-name">${d.day}</span>
+        <span class="day-val" style="color:${col}">${d.avg.toFixed(0)} <span style="color:var(--muted);font-size:10px;font-weight:400">mg/dL</span></span>
+      </div>`;
+    }).join('');
+  }
+
+  renderDays(best, 'best-days', true);
+  renderDays(worst, 'worst-days', false);
+}
+
+// ════════════════════════════════════════════════
+// CHARTS
+// ════════════════════════════════════════════════
+const THEME = () => getComputedStyle(document.body);
+const C = {
+  red: '#ef4444',
+  green: '#10b981',
+  high: '#f97316',
+  accent: '#3b82f6',
+  accent2: '#06b6d4',
+  muted: () => getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#6b7fa3',
+  border: () => getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#1e2d45',
+  text: () => getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e8edf5',
+};
+
+function pointColor(v) {
+  if (v < 70)  return C.red;
+  if (v > 180) return C.high;
+  return C.green;
+}
+
+function updateCharts() {
+  buildLineChart();
+  buildHourlyChart();
+  buildDailyChart();
+}
+
+function buildLineChart() {
+  const data = filteredData;
+  const labels = data.map(d => d.datetime);
+  const values = data.map(d => d.value);
+  const colors = values.map(pointColor);
+
+  if (lineChart) lineChart.destroy();
+
+  const ctx = document.getElementById('line-chart').getContext('2d');
+  lineChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Glucose',
+        data: values,
+        borderColor: C.accent2,
+        borderWidth: 1.5,
+        pointBackgroundColor: colors,
+        pointBorderColor: colors,
+        pointRadius: data.length > 500 ? 1.5 : 3,
+        pointHoverRadius: 5,
+        tension: 0.3,
+        fill: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        zoom: {
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+          pan: { enabled: true, mode: 'x' }
+        },
+        tooltip: {
+          callbacks: {
+            title: ctx => fmtDt(ctx[0].parsed.x ? new Date(ctx[0].parsed.x) : filteredData[ctx[0].dataIndex]?.datetime),
+            label: ctx => `${ctx.parsed.y} mg/dL`
+          }
+        },
+        annotation: {
+          annotations: {
+            low70: { type: 'line', yMin: 70, yMax: 70, borderColor: 'rgba(239,68,68,0.6)', borderWidth: 1, borderDash: [6, 4], label: { content: '70', display: true, color: C.red, font: { size: 10, family: 'DM Mono' }, position: 'start' } },
+            high180: { type: 'line', yMin: 180, yMax: 180, borderColor: 'rgba(249,115,22,0.6)', borderWidth: 1, borderDash: [6, 4], label: { content: '180', display: true, color: C.high, font: { size: 10, family: 'DM Mono' }, position: 'start' } }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { tooltipFormat: 'MMM d, HH:mm' },
+          ticks: { color: C.muted(), maxTicksLimit: 8, font: { family: 'DM Mono', size: 10 } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+        },
+        y: {
+          ticks: { color: C.muted(), font: { family: 'DM Mono', size: 10 }, callback: v => v + ' mg/dL' },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          suggestedMin: 40,
+          suggestedMax: 250
+        }
+      }
+    }
+  });
+}
+
+function buildHourlyChart() {
+  const buckets = Array(24).fill(null).map(() => []);
+  filteredData.forEach(d => buckets[d.datetime.getHours()].push(d.value));
+  const avgs = buckets.map(b => b.length ? b.reduce((a, v) => a + v, 0) / b.length : null);
+  const labels = Array.from({length:24}, (_, i) => `${i}:00`);
+  const bkgColors = avgs.map(v => v === null ? 'rgba(107,127,163,0.3)' : v < 70 ? 'rgba(239,68,68,0.7)' : v > 180 ? 'rgba(249,115,22,0.7)' : 'rgba(16,185,129,0.7)');
+
+  if (hourlyChart) hourlyChart.destroy();
+  const ctx = document.getElementById('hourly-chart').getContext('2d');
+  hourlyChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Avg glucose', data: avgs, backgroundColor: bkgColors, borderRadius: 4, borderSkipped: false }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y ? `${ctx.parsed.y.toFixed(1)} mg/dL` : 'No data' } } },
+      scales: {
+        x: { ticks: { color: C.muted(), font: { family: 'DM Mono', size: 9 }, maxRotation: 45 }, grid: { display: false } },
+        y: { ticks: { color: C.muted(), font: { family: 'DM Mono', size: 10 }, callback: v => v + '' }, grid: { color: 'rgba(255,255,255,0.04)' }, suggestedMin: 60, suggestedMax: 200 }
+      }
+    }
+  });
+}
+
+function buildDailyChart() {
+  const byDay = {};
+  filteredData.forEach(d => {
+    const key = toInputDate(d.datetime);
+    if (!byDay[key]) byDay[key] = [];
+    byDay[key].push(d.value);
+  });
+  const days = Object.keys(byDay).sort();
+  const avgs = days.map(day => byDay[day].reduce((a, b) => a + b, 0) / byDay[day].length);
+  const colors = avgs.map(v => v < 70 ? 'rgba(239,68,68,0.7)' : v > 180 ? 'rgba(249,115,22,0.7)' : 'rgba(59,130,246,0.7)');
+  const labels = days.map(d => d.slice(5)); // MM-DD
+
+  if (dailyChart) dailyChart.destroy();
+  const ctx = document.getElementById('daily-chart').getContext('2d');
+  dailyChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Daily avg', data: avgs, backgroundColor: colors, borderRadius: 4, borderSkipped: false }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: ctx => days[ctx[0].dataIndex], label: ctx => `${ctx.parsed.y.toFixed(1)} mg/dL` } } },
+      scales: {
+        x: { ticks: { color: C.muted(), font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 14, maxRotation: 45 }, grid: { display: false } },
+        y: { ticks: { color: C.muted(), font: { family: 'DM Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, suggestedMin: 60, suggestedMax: 200 }
+      }
+    }
+  });
+}
+
+function resetZoom() { if (lineChart) lineChart.resetZoom(); }
+
+// ════════════════════════════════════════════════
+// TABLE
+// ════════════════════════════════════════════════
+function sortTable(col) {
+  if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  else { sortCol = col; sortDir = 'desc'; }
+
+  ['th-datetime', 'th-value'].forEach(id => {
+    const el2 = document.getElementById(id);
+    el2.classList.remove('sort-asc', 'sort-desc');
+  });
+  const id = col === 'datetime' ? 'th-datetime' : 'th-value';
+  document.getElementById(id).classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  renderTable();
+}
+
+function renderTable() {
+  const search  = document.getElementById('table-search').value.toLowerCase();
+  const pageSize= document.getElementById('table-page-size').value;
+
+  let rows = [...filteredData];
+
+  // Search
+  if (search) {
+    rows = rows.filter(d => fmtDt(d.datetime).toLowerCase().includes(search) || d.value.toString().includes(search));
+  }
+
+  // Sort
+  rows.sort((a, b) => {
+    const va = sortCol === 'datetime' ? a.datetime.getTime() : a.value;
+    const vb = sortCol === 'datetime' ? b.datetime.getTime() : b.value;
+    return sortDir === 'asc' ? va - vb : vb - va;
+  });
+
+  const total = rows.length;
+  const ps    = pageSize === 'all' ? total : parseInt(pageSize);
+  const pages = Math.ceil(total / ps) || 1;
+  if (currentPage > pages) currentPage = pages;
+
+  const slice = rows.slice((currentPage - 1) * ps, currentPage * ps);
+
+  const tbody = document.getElementById('table-body');
+
+  if (slice.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No readings match current filters.</td></tr>';
+  } else {
+    tbody.innerHTML = slice.map(d => {
+      const rowCls = d.value < 70 ? 'row-low' : d.value > 180 ? 'row-high' : '';
+      const pill   = d.value < 70 ? '<span class="status-pill pill-low">Low</span>'
+                   : d.value > 180 ? '<span class="status-pill pill-high">High</span>'
+                   : '<span class="status-pill pill-normal">Normal</span>';
+      return `<tr class="${rowCls}">
+        <td>${fmtDt(d.datetime)}</td>
+        <td class="val-cell">${d.value}</td>
+        <td>${pill}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  el('table-count').textContent = `(${total} readings)`;
+  el('table-footer-info').textContent = `Showing ${Math.min((currentPage-1)*ps+1, total)}–${Math.min(currentPage*ps, total)} of ${total}`;
+  el('page-display').textContent = `${currentPage} / ${pages}`;
+  el('prev-page').disabled = currentPage <= 1;
+  el('next-page').disabled = currentPage >= pages;
+
+  window._tableRows = rows;
+  window._tablePs   = ps;
+  window._tablePages = pages;
+}
+
+function changePage(delta) {
+  currentPage += delta;
+  if (currentPage < 1) currentPage = 1;
+  if (currentPage > (window._tablePages || 1)) currentPage = window._tablePages || 1;
+  renderTable();
+}
+
+function scrollToLowReadings() {
+  document.getElementById('table-search').value = '';
+  document.getElementById('alert-filter').value = 'low';
+  applyFilters();
+  document.querySelector('.table-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ════════════════════════════════════════════════
+// EXPORT
+// ════════════════════════════════════════════════
+function exportCSV() {
+  const data = filteredData;
+  const header = 'DateTime,Glucose_mgdL,Status\n';
+  const rows   = data.map(d => {
+    const status = d.value < 70 ? 'Low' : d.value > 180 ? 'High' : 'Normal';
+    return `"${fmtDt(d.datetime)}",${d.value},${status}`;
+  });
+  download('glucose_export.csv', header + rows.join('\n'), 'text/csv');
+}
+
+function exportExcel() {
+  const data = filteredData;
+  const wsData = [['DateTime', 'Glucose (mg/dL)', 'Status']];
+  data.forEach(d => {
+    const status = d.value < 70 ? 'Low' : d.value > 180 ? 'High' : 'Normal';
+    wsData.push([fmtDt(d.datetime), d.value, status]);
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{ wch: 22 }, { wch: 16 }, { wch: 10 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Glucose Data');
+
+  // Summary sheet
+  const values = data.map(d => d.value);
+  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  const summaryData = [
+    ['Metric', 'Value'],
+    ['Average Glucose', avg.toFixed(1) + ' mg/dL'],
+    ['Minimum', Math.min(...values) + ' mg/dL'],
+    ['Maximum', Math.max(...values) + ' mg/dL'],
+    ['Total Readings', values.length],
+    ['Hypo Events (<70)', values.filter(v => v < 70).length],
+    ['High Events (>180)', values.filter(v => v > 180).length],
+    ['Time in Range (%)', ((values.filter(v => v >= 70 && v <= 180).length / values.length) * 100).toFixed(1) + '%'],
+    ['Est. A1C', ((avg + 46.7) / 28.7).toFixed(1) + '%'],
+    ['Export Date', new Date().toLocaleString()]
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+  ws2['!cols'] = [{ wch: 22 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+  XLSX.writeFile(wb, 'glucose_report.xlsx');
+}
+
+function exportChart(chartId) {
+  const canvas = document.getElementById(chartId);
+  const link = document.createElement('a');
+  link.download = chartId + '_glucoview.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function download(filename, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = filename;
+  a.click();
+}
+
+// ════════════════════════════════════════════════
+// THEME
+// ════════════════════════════════════════════════
+function toggleTheme() {
+  const body = document.body;
+  const isDark = body.getAttribute('data-theme') === 'dark';
+  body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-toggle').textContent = isDark ? '🌙' : '☀️';
+  // Rebuild charts to pick up new colors
+  if (filteredData.length) {
+    setTimeout(updateCharts, 50);
+  }
+}
+
+// ════════════════════════════════════════════════
+// RESET
+// ════════════════════════════════════════════════
+function resetDashboard() {
+  allData = []; filteredData = [];
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('upload-section').style.display = 'flex';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('export-csv-btn').style.display = 'none';
+  document.getElementById('export-excel-btn').style.display = 'none';
+  document.getElementById('preview-strip').style.display = 'none';
+  document.getElementById('csv-input').value = '';
+  if (lineChart)   { lineChart.destroy();   lineChart   = null; }
+  if (hourlyChart) { hourlyChart.destroy(); hourlyChart = null; }
+  if (dailyChart)  { dailyChart.destroy();  dailyChart  = null; }
+}
+
+// ════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════
+function el(id) { return document.getElementById(id); }
+function showLoading(show) { document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none'; }
+function toInputDate(d) { return d.toISOString().slice(0, 10); }
+function fmtDt(d) {
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+// Load chartjs-plugin-annotation and time adapter lazily
+(function() {
+  function loadScript(src, cb) {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = cb || null;
+    document.head.appendChild(s);
+  }
+  loadScript('https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js');
+  loadScript('https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js');
+})();
+</script>
+</body>
+</html>
