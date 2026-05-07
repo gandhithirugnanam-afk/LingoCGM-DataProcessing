@@ -12,6 +12,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
@@ -4140,8 +4142,67 @@ function exportChartPNG(canvasId) {
   const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = canvasId + '.png'; a.click();
 }
 
-function exportPDF(vid) {
-  alert('PDF export: open the browser print dialog (Cmd/Ctrl+P) and choose "Save as PDF". A proper PDF export will require jsPDF integration.');
+async function exportPDF(vid) {
+  const st = STATE[vid];
+  if (!st || !st.filtered.length) return;
+
+  const source = vid === 'v2' ? $('v2-rt-main') : $('v1-dashboard');
+  const button = $(vid + '-pdf-btn');
+  if (!source || !window.html2canvas || !window.jspdf?.jsPDF) {
+    window.print();
+    return;
+  }
+
+  const previousButtonHtml = button ? button.innerHTML : '';
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Exporting...';
+  }
+
+  try {
+    const canvas = await html2canvas(source, {
+      backgroundColor: getComputedStyle(document.body).backgroundColor || '#ffffff',
+      scale: Math.min(2, window.devicePixelRatio || 1.5),
+      useCORS: true,
+      logging: false,
+      windowWidth: source.scrollWidth,
+      windowHeight: source.scrollHeight
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 8;
+    const imgWidth = pageWidth - margin * 2;
+    const imgHeight = canvas.height * imgWidth / canvas.width;
+    const imgData = canvas.toDataURL('image/png', 1.0);
+    let remainingHeight = imgHeight;
+    let y = margin;
+
+    pdf.addImage(imgData, 'PNG', margin, y, imgWidth, imgHeight);
+    remainingHeight -= pageHeight - margin * 2;
+
+    while (remainingHeight > 0) {
+      y -= pageHeight - margin * 2;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', margin, y, imgWidth, imgHeight);
+      remainingHeight -= pageHeight - margin * 2;
+    }
+
+    const activeUser = st.users.find(u => u.id === st.activeId);
+    const label = activeUser ? activeUser.name : 'dashboard';
+    const safeLabel = String(label).replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+    pdf.save(`lingocgm-${vid}-${safeLabel || 'dashboard'}.pdf`);
+  } catch (err) {
+    console.error('PDF export failed', err);
+    window.print();
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = previousButtonHtml || 'Export PDF';
+    }
+  }
 }
 
 // ─── TWEAKS PANEL ─────────────────────────────
