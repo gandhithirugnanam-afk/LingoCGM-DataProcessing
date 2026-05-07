@@ -566,6 +566,81 @@ select:focus, input[type="date"]:focus { border-color: var(--accent); }
   font-size: 13px; line-height: 1;
 }
 .v-close:hover { color: var(--text); }
+.v-errlog-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-family: var(--font-mono); font-weight: 600;
+  padding: 2px 8px; border-radius: 4px; cursor: pointer;
+  background: var(--red-bg); border: 1px solid rgba(220,38,38,0.3); color: var(--red);
+  margin-top: 4px; transition: all var(--tr);
+}
+.v-errlog-btn:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+
+/* ─── ERROR LOG MODAL ─── */
+#error-log-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(14,22,36,0.45); z-index: 9500;
+  align-items: center; justify-content: center;
+}
+#error-log-backdrop.open { display: flex; }
+#error-log-modal {
+  background: var(--surface); border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(14,22,36,0.18);
+  width: min(860px, 95vw); max-height: 80vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.el-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  background: var(--red-bg);
+}
+.el-title { font-size: 14px; font-weight: 700; color: var(--red); flex: 1; }
+.el-subtitle { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+.el-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 18px; line-height: 1; padding: 0;
+}
+.el-close:hover { color: var(--text); }
+.el-toolbar {
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--surface2);
+}
+.el-filter-btn {
+  font-size: 10px; font-family: var(--font-mono); font-weight: 600;
+  padding: 3px 10px; border-radius: 20px; cursor: pointer; border: 1px solid var(--border2);
+  background: var(--surface); color: var(--text2); transition: all var(--tr);
+}
+.el-filter-btn.active { background: var(--red); color: #fff; border-color: var(--red); }
+.el-filter-btn:hover:not(.active) { border-color: var(--red); color: var(--red); }
+.el-count { font-size: 10px; font-family: var(--font-mono); color: var(--muted); margin-left: auto; }
+.el-export-btn {
+  font-size: 10px; font-family: var(--font-mono); padding: 3px 10px;
+  border-radius: 4px; border: 1px solid var(--border2); background: var(--surface);
+  color: var(--text2); cursor: pointer; transition: all var(--tr);
+}
+.el-export-btn:hover { border-color: var(--accent); color: var(--accent); }
+.el-body { overflow-y: auto; flex: 1; }
+.el-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
+.el-table thead { position: sticky; top: 0; background: var(--surface2); z-index: 1; }
+.el-table th {
+  padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--border2); white-space: nowrap;
+}
+.el-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.el-table tr:last-child td { border-bottom: none; }
+.el-table tr:hover td { background: var(--surface2); }
+.el-badge {
+  display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px;
+  border-radius: 3px; font-family: var(--font-mono); white-space: nowrap;
+}
+.el-bad-date  { background: #fef2f2; color: #dc2626; }
+.el-bad-val   { background: #fff7ed; color: #b45309; }
+.el-oor       { background: #fefce8; color: #854d0e; }
+.el-nphy      { background: #f5f3ff; color: #7c3aed; }
+.el-empty     { background: var(--surface2); color: var(--muted); }
+.el-cell-val  { color: var(--red); font-weight: 600; }
+.el-empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
 
 /* Loading overlay */
 #loading-overlay {
@@ -1666,6 +1741,46 @@ tr:hover td { background: var(--surface2); }
   <div id="glossary-panel-body" style="padding:14px 18px;display:flex;flex-direction:column;gap:14px"></div>
 </div>
 
+<!-- Error Log Modal -->
+<div id="error-log-backdrop" onclick="if(event.target===this)closeErrorLog()">
+  <div id="error-log-modal">
+    <div class="el-header">
+      <div>
+        <div class="el-title">Parse Error Log</div>
+        <div class="el-subtitle" id="el-subtitle">—</div>
+      </div>
+      <button class="el-close" onclick="closeErrorLog()" title="Close">✕</button>
+    </div>
+    <div class="el-toolbar">
+      <span style="font-size:11px;color:var(--text2);font-weight:500">Filter:</span>
+      <button class="el-filter-btn active" onclick="filterErrorLog('all',this)">All</button>
+      <button class="el-filter-btn" onclick="filterErrorLog('bad-date',this)">Bad Date</button>
+      <button class="el-filter-btn" onclick="filterErrorLog('bad-val',this)">Non-numeric</button>
+      <button class="el-filter-btn" onclick="filterErrorLog('oor',this)">Out-of-Range Text</button>
+      <button class="el-filter-btn" onclick="filterErrorLog('nphy',this)">Physiologically Implausible</button>
+      <button class="el-filter-btn" onclick="filterErrorLog('empty',this)">Empty Cell</button>
+      <span class="el-count" id="el-row-count"></span>
+      <button class="el-export-btn" onclick="exportErrorLogCSV()">Export CSV</button>
+    </div>
+    <div class="el-body">
+      <table class="el-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>File</th>
+            <th>Row</th>
+            <th>Timestamp Cell</th>
+            <th>Glucose Cell</th>
+            <th>Error Type</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="el-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- Loading Overlay -->
 <div id="loading-overlay">
   <div class="loading-box">
@@ -1696,6 +1811,10 @@ tr:hover td { background: var(--surface2); }
     </a>
     <div class="v1-header-right">
       <div id="v1-user-tabs" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"></div>
+      <button class="btn btn-sm" id="v1-errlog-btn" style="display:none;background:var(--red-bg);border-color:rgba(220,38,38,0.3);color:var(--red)" onclick="showErrorLog('v1')" title="View parse errors">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="v1-errlog-count">0</span> Error Log
+      </button>
       <button class="btn btn-sm" id="v1-add-btn" style="display:none" onclick="document.getElementById('v1-csv').click()">+ Subject</button>
       <button class="btn btn-sm btn-pdf" id="v1-pdf-btn" style="display:none" onclick="exportPDF('v1')">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -2421,6 +2540,10 @@ tr:hover td { background: var(--surface2); }
     </a>
     <div class="v1-header-right">
       <div id="v2-user-tabs" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"></div>
+      <button class="btn btn-sm" id="v2-errlog-btn" style="display:none;background:rgba(220,38,38,0.15);border-color:rgba(220,38,38,0.4);color:#ef4444" onclick="showErrorLog('v2')" title="View parse errors">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="v2-errlog-count">0</span> Errors
+      </button>
       <button class="btn btn-sm" id="v2-add-btn" style="display:none;background:#111f35;border-color:#1e2d45;color:#8899b5" onclick="document.getElementById('v2-csv').click()">+ Subject</button>
       <button class="btn btn-sm" id="v2-pdf-btn" style="display:none;background:#111f35;border-color:#1e2d45;color:#ef4444" onclick="exportPDF('v2')">Export PDF</button>
     </div>
@@ -2672,8 +2795,8 @@ const DARK_COLORS  = ['#3b82f6','#10b981','#f59e0b','#a78bfa','#f87171','#22d3ee
 
 // ─── STATE per variant ─────────────────────────
 const STATE = {
-  v1: { users:[], activeId:null, allData:[], filtered:[], sortCol:'datetime', sortDir:'desc', page:1, charts:{} },
-  v2: { users:[], activeId:null, allData:[], filtered:[], sortCol:'datetime', sortDir:'desc', page:1, charts:{} }
+  v1: { users:[], activeId:null, allData:[], filtered:[], sortCol:'datetime', sortDir:'desc', page:1, charts:{}, errorLog:[] },
+  v2: { users:[], activeId:null, allData:[], filtered:[], sortCol:'datetime', sortDir:'desc', page:1, charts:{}, errorLog:[] }
 };
 
 // Helpers
@@ -2758,17 +2881,44 @@ function processData(rows, fileName, vid) {
   if (!valKey)  valKey  = keys.find(k => k !== timeKey) || keys[1];
 
   const parsed = [], skipped = { oor:0, nphy:0, bad:0, date:0 };
-  rows.forEach(row => {
-    const raw = (row[valKey]||'').toString().trim();
-    if (!raw) { skipped.bad++; return; }
-    if (/out of range|^low$|^high$/i.test(raw)) { skipped.oor++; return; }
+  const fileErrors = [];
+  rows.forEach((row, idx) => {
+    const rowNum  = idx + 2; // 1-based + header row
+    const rawTime = (row[timeKey] || '').toString().trim();
+    const raw     = (row[valKey]  || '').toString().trim();
+
+    if (!raw) {
+      skipped.bad++;
+      fileErrors.push({ file: fileName, row: rowNum, timeRaw: rawTime, valRaw: '(empty)', type: 'empty', detail: `Column "${valKey}" is empty` });
+      return;
+    }
+    if (/out of range|^low$|^high$/i.test(raw)) {
+      skipped.oor++;
+      fileErrors.push({ file: fileName, row: rowNum, timeRaw: rawTime, valRaw: raw, type: 'oor', detail: `Device reported "${raw}" — sensor saturation` });
+      return;
+    }
     const num = parseFloat(raw);
-    if (isNaN(num)) { skipped.bad++; return; }
-    if (num < 20 || num > 700) { skipped.nphy++; return; }
-    const dt = new Date(row[timeKey]);
-    if (isNaN(dt.getTime())) { skipped.date++; return; }
+    if (isNaN(num)) {
+      skipped.bad++;
+      fileErrors.push({ file: fileName, row: rowNum, timeRaw: rawTime, valRaw: raw, type: 'bad-val', detail: `Cannot parse "${raw}" as a number` });
+      return;
+    }
+    if (num < 20 || num > 700) {
+      skipped.nphy++;
+      fileErrors.push({ file: fileName, row: rowNum, timeRaw: rawTime, valRaw: raw, type: 'nphy', detail: `${num} mg/dL is outside physiological range (20–700)` });
+      return;
+    }
+    const dt = new Date(rawTime);
+    if (isNaN(dt.getTime())) {
+      skipped.date++;
+      fileErrors.push({ file: fileName, row: rowNum, timeRaw: rawTime || '(empty)', valRaw: raw, type: 'bad-date', detail: `Cannot parse "${rawTime || '(empty)'}" as a date/time` });
+      return;
+    }
     parsed.push({ datetime: dt, value: num });
   });
+
+  // Append to global error log
+  STATE[vid].errorLog.push(...fileErrors);
 
   if (parsed.length < 5) { showError(vid, [`Only ${parsed.length} valid readings found — need ≥ 5.`]); return; }
   parsed.sort((a,b) => a.datetime - b.datetime);
@@ -2782,7 +2932,7 @@ function processData(rows, fileName, vid) {
     filters: { range:'7d', tod:'all', alert:'all' } });
 
   const totalSkip = skipped.oor + skipped.nphy + skipped.bad + skipped.date;
-  showDashboard(vid, id, { fileName, timeKey, valKey, total: rows.length, valid: parsed.length, totalSkip, skipped });
+  showDashboard(vid, id, { fileName, timeKey, valKey, total: rows.length, valid: parsed.length, totalSkip, skipped, fileErrors });
 }
 
 function showDashboard(vid, newId, info) {
@@ -2806,6 +2956,21 @@ function showDashboard(vid, newId, info) {
   }
   setActiveUser(vid, newId);
   showValidationBanner(vid, info);
+  // Update persistent error log header button
+  _updateErrLogBtn(vid);
+}
+
+function _updateErrLogBtn(vid) {
+  const total = STATE[vid].errorLog.length;
+  const btn   = $(vid + '-errlog-btn');
+  const cnt   = $(vid + '-errlog-count');
+  if (!btn) return;
+  if (total > 0) {
+    btn.style.display = 'inline-flex';
+    if (cnt) cnt.textContent = total;
+  } else {
+    btn.style.display = 'none';
+  }
 }
 
 function setActiveUser(vid, id) {
@@ -4107,11 +4272,20 @@ function showError(vid, lines) {
   panel.innerHTML = lines.map((l,i) => `<div class="v-row ${i===0?'v-error':'v-muted'}">${l}</div>`).join('');
 }
 
-function showValidationBanner(vid, { fileName, timeKey, valKey, total, valid, totalSkip, skipped }) {
+function showValidationBanner(vid, { fileName, timeKey, valKey, total, valid, totalSkip, skipped, fileErrors }) {
   const banner = $(vid + '-val-banner');
   if (!banner) return;
-  let html = `<div class="v-row v-ok">✓ ${valid.toLocaleString()} readings loaded from "${fileName}"</div>`;
-  if (totalSkip > 0) html += `<div class="v-row v-warn">⚠ ${totalSkip} of ${total} rows skipped (out-of-range/bad date/non-numeric)</div>`;
+  let html = `<div class="v-row v-ok">✓ ${valid.toLocaleString()} readings loaded from "${fileName}" <span style="color:var(--muted)">(columns: ${timeKey} / ${valKey})</span></div>`;
+  if (totalSkip > 0) {
+    const parts = [];
+    if (skipped.bad  > 0) parts.push(`${skipped.bad} non-numeric/empty`);
+    if (skipped.date > 0) parts.push(`${skipped.date} bad date`);
+    if (skipped.oor  > 0) parts.push(`${skipped.oor} out-of-range text`);
+    if (skipped.nphy > 0) parts.push(`${skipped.nphy} implausible value`);
+    html += `<div class="v-row v-warn">⚠ ${totalSkip} of ${total} rows skipped — ${parts.join(', ')}
+      <button class="v-errlog-btn" onclick="showErrorLog('${vid}')">View Error Log (${totalSkip})</button>
+    </div>`;
+  }
   banner.innerHTML = html + `<button class="v-close" onclick="this.parentElement.style.display='none'">✕</button>`;
   banner.style.display = 'flex';
   if (totalSkip === 0) { clearTimeout(banner._t); banner._t = setTimeout(()=>banner.style.display='none', 5000); }
@@ -4223,6 +4397,96 @@ function applyTweaks() {
   if (compactEl) compactEl.checked = tweaks.compactCards;
   const trendToggle = document.getElementById('tweak-trend');
   if (trendToggle) trendToggle.checked = tweaks.showTrend;
+}
+
+// ─── ERROR LOG ────────────────────────────────
+let _errorLogVid = 'v1';
+let _errorLogFilter = 'all';
+
+const ERROR_TYPE_LABELS = {
+  'bad-date': ['el-bad-date',  'Bad Date'],
+  'bad-val':  ['el-bad-val',   'Non-numeric'],
+  'oor':      ['el-oor',       'Out-of-Range Text'],
+  'nphy':     ['el-nphy',      'Implausible Value'],
+  'empty':    ['el-empty',     'Empty Cell'],
+};
+
+function showErrorLog(vid) {
+  _errorLogVid = vid;
+  _errorLogFilter = 'all';
+  document.querySelectorAll('.el-filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.el-filter-btn')?.classList.add('active');
+  _renderErrorLog();
+  $('error-log-backdrop').classList.add('open');
+}
+
+function closeErrorLog() {
+  $('error-log-backdrop').classList.remove('open');
+}
+
+function filterErrorLog(type, btn) {
+  _errorLogFilter = type;
+  document.querySelectorAll('.el-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _renderErrorLog();
+}
+
+function _renderErrorLog() {
+  const all  = STATE[_errorLogVid].errorLog;
+  const rows = _errorLogFilter === 'all' ? all : all.filter(e => e.type === _errorLogFilter);
+  const totalAll = all.length;
+
+  $('el-subtitle').textContent =
+    `${totalAll} skipped row${totalAll !== 1 ? 's' : ''} across ${[...new Set(all.map(e => e.file))].length} file(s)`;
+  $('el-row-count').textContent = `Showing ${rows.length} of ${totalAll}`;
+
+  const tbody = $('el-table-body');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="el-empty-state">${_errorLogFilter === 'all' ? 'No errors recorded.' : 'No errors of this type.'}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map((e, i) => {
+    const [cls, label] = ERROR_TYPE_LABELS[e.type] || ['el-empty', e.type];
+    const timeCell = e.type === 'bad-date'
+      ? `<span class="el-cell-val" title="Unparseable timestamp">${escHtml(e.timeRaw)}</span>`
+      : escHtml(e.timeRaw) || '<span style="color:var(--muted)">—</span>';
+    const valCell  = ['bad-val','oor','nphy','empty'].includes(e.type)
+      ? `<span class="el-cell-val" title="Problematic value">${escHtml(e.valRaw)}</span>`
+      : escHtml(e.valRaw);
+    return `<tr>
+      <td style="color:var(--muted)">${i + 1}</td>
+      <td style="color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(e.file)}">${escHtml(e.file)}</td>
+      <td>${e.row}</td>
+      <td>${timeCell}</td>
+      <td>${valCell}</td>
+      <td><span class="el-badge ${cls}">${label}</span></td>
+      <td style="color:var(--text2)">${escHtml(e.detail)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function exportErrorLogCSV() {
+  const all = STATE[_errorLogVid].errorLog;
+  const rows = _errorLogFilter === 'all' ? all : all.filter(e => e.type === _errorLogFilter);
+  if (!rows.length) return;
+  const headers = ['#','File','Row','Timestamp Cell','Glucose Cell','Error Type','Detail'];
+  const lines   = rows.map((e, i) => [
+    i+1, `"${e.file.replace(/"/g,'""')}"`, e.row,
+    `"${e.timeRaw.replace(/"/g,'""')}"`,
+    `"${e.valRaw.replace(/"/g,'""')}"`,
+    e.type,
+    `"${e.detail.replace(/"/g,'""')}"`
+  ].join(','));
+  const csv  = [headers.join(','), ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'parse-error-log.csv'; a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // ─── BUILD COMPARE on tab click ───────────────
