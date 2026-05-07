@@ -1334,6 +1334,203 @@ tr:hover td { background: var(--surface2); }
 .tir-target-miss  { color: var(--red);   font-weight: 600; }
 .tir-target-warn  { color: var(--amber); font-weight: 600; }
 
+/* ─── SUBJECT SETTINGS MODAL ─── */
+.subject-modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(14,22,36,0.55);
+  z-index: 5000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.subject-modal-backdrop.open { display: flex; }
+.subject-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  width: 460px;
+  max-width: 96vw;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.modal-header h3 { font-size: 14px; font-weight: 600; }
+.modal-close { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; padding: 4px; border-radius: 4px; }
+.modal-close:hover { color: var(--text); background: var(--surface2); }
+.modal-body { padding: 18px 20px; }
+.modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  background: var(--surface2);
+  position: sticky;
+  bottom: 0;
+}
+.modal-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  margin-top: 18px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-section-title:first-child { margin-top: 0; }
+.form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.form-row label { font-size: 12px; font-weight: 500; color: var(--text2); }
+.form-row input[type="date"],
+.form-row input[type="text"],
+.form-row textarea {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  transition: border-color var(--tr);
+  background-image: none;
+}
+.form-row input:focus, .form-row textarea:focus { border-color: var(--accent); }
+.form-row textarea { resize: vertical; min-height: 52px; font-family: var(--font-sans); }
+.form-hint { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.modal-data-range {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+.met-period-preview {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  margin-top: 5px;
+  min-height: 16px;
+}
+.met-period-preview .pre-span  { color: var(--amber); font-weight: 600; }
+.met-period-preview .on-span   { color: var(--green); font-weight: 600; }
+.toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.toggle-row label { font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text2); }
+.form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* Subject chip settings/badge */
+.subject-settings {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 3px;
+  line-height: 1;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity var(--tr);
+  flex-shrink: 0;
+}
+.subject-chip:hover .subject-settings { opacity: 1; }
+.subject-settings:hover { color: var(--accent); background: var(--accent-bg); }
+.subject-met-badge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.met-badge-pre { background: var(--amber-bg); color: var(--amber); }
+.met-badge-on  { background: var(--green-bg);  color: var(--green); }
+/* Before/After comparison */
+.ba-notice {
+  background: var(--purple-bg);
+  border: 1px solid rgba(124,58,237,0.2);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--purple);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.before-after-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 16px;
+  background: var(--surface);
+}
+.ba-col { padding: 16px 18px; }
+.ba-col:first-child { border-right: 1px solid var(--border); }
+.ba-col-header {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ba-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+.ba-metric-row:last-child { border-bottom: none; padding-bottom: 0; }
+.ba-metric-label { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.ba-right { display: flex; align-items: center; gap: 6px; }
+.ba-metric-value { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
+.ba-delta {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.ba-improve { background: var(--green-bg); color: var(--green); }
+.ba-worsen  { background: var(--red-bg);   color: var(--red); }
+.ba-neutral { background: var(--surface2); color: var(--muted); }
+.ba-dose-row {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ba-dose-row strong { color: var(--text2); }
+
 </style>
 </head>
 <body>
@@ -1697,6 +1894,45 @@ tr:hover td { background: var(--surface2); }
             </div>
           </div>
 
+          <!-- Before/After Metformin Comparison (shown only when a subject has period tracking enabled) -->
+          <div id="v1-ba-section" style="display:none">
+            <div class="research-section-title">Before / After Metformin Comparison <span class="section-badge">TREATMENT RESPONSE</span></div>
+            <div class="ba-notice" id="v1-ba-notice">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span id="v1-ba-notice-text">—</span>
+            </div>
+            <div class="before-after-grid" id="v1-ba-grid">
+              <div class="ba-col">
+                <div class="ba-col-header" style="color:var(--amber)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Pre-Metformin
+                  <span style="color:var(--muted);font-weight:400;font-size:9px;margin-left:auto" id="v1-ba-pre-days">—</span>
+                </div>
+                <div id="v1-ba-pre-metrics"></div>
+              </div>
+              <div class="ba-col">
+                <div class="ba-col-header" style="color:var(--green)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  On Metformin
+                  <span style="color:var(--muted);font-weight:400;font-size:9px;margin-left:auto" id="v1-ba-on-days">—</span>
+                </div>
+                <div id="v1-ba-on-metrics"></div>
+              </div>
+            </div>
+
+            <!-- Week-relative trend chart -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Weekly Glucose Trend Relative to Metformin Start</div>
+                  <div class="chart-subtitle">Average glucose per week — week 0 = metformin start · negative = pre-treatment · positive = post-start</div>
+                </div>
+              </div>
+              <canvas id="v1-week-rel-chart" height="90"></canvas>
+              <div class="zoom-hint" style="margin-top:8px">Purple dashed line = metformin start · Green = on metformin · Amber = pre-metformin</div>
+            </div>
+          </div>
+
           <!-- Glycemic Variability Metrics -->
           <div class="research-section-title">Glycemic Variability Metrics <span class="section-badge">KEY INDICATORS</span></div>
           <div class="research-metrics-grid">
@@ -1902,6 +2138,77 @@ tr:hover td { background: var(--surface2); }
 
       </div><!-- end v1-dashboard -->
     </main>
+  </div>
+</div>
+
+<!-- SUBJECT SETTINGS MODAL -->
+<div class="subject-modal-backdrop" id="v1-subject-modal-backdrop" onclick="if(event.target===this)closeSubjectModal('v1')">
+  <div class="subject-modal">
+    <div class="modal-header">
+      <h3 id="v1-modal-subject-name">Subject Settings</h3>
+      <button class="modal-close" onclick="closeSubjectModal('v1')" title="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-data-range" id="v1-modal-data-range">Loading…</div>
+
+      <div class="modal-section-title">Metformin Treatment Period</div>
+      <div class="toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="v1-modal-met-enabled" onchange="updateModalPreview('v1')">
+          <span class="toggle-slider"></span>
+        </label>
+        <label for="v1-modal-met-enabled" style="font-size:13px;font-weight:500;color:var(--text2)">Enable period tracking for this subject</label>
+      </div>
+      <div id="v1-modal-met-fields">
+        <div class="form-row">
+          <label>Metformin Start Date</label>
+          <input type="date" id="v1-modal-met-start" oninput="updateModalPreview('v1')">
+          <div class="form-hint">Data before this date = Pre-Metformin &nbsp;·&nbsp; Data from this date onwards = On Metformin</div>
+          <div class="met-period-preview" id="v1-modal-met-preview"></div>
+        </div>
+        <div class="form-2col">
+          <div class="form-row">
+            <label>Starting Dose</label>
+            <input type="text" id="v1-modal-met-dose-start" placeholder="e.g. 500 mg">
+          </div>
+          <div class="form-row">
+            <label>Maintenance / Target Dose</label>
+            <input type="text" id="v1-modal-met-dose-now" placeholder="e.g. 1000 mg">
+          </div>
+        </div>
+
+        <div class="modal-section-title">Optional: Baseline Lab Values</div>
+        <div class="form-2col">
+          <div class="form-row">
+            <label>Baseline HbA1c (%)</label>
+            <input type="text" id="v1-modal-hba1c-pre" placeholder="e.g. 7.8">
+          </div>
+          <div class="form-row">
+            <label>Follow-up HbA1c (%)</label>
+            <input type="text" id="v1-modal-hba1c-post" placeholder="e.g. 6.9">
+          </div>
+        </div>
+        <div class="form-2col">
+          <div class="form-row">
+            <label>BMI (kg/m²)</label>
+            <input type="text" id="v1-modal-bmi" placeholder="e.g. 28.4">
+          </div>
+          <div class="form-row">
+            <label>eGFR (mL/min)</label>
+            <input type="text" id="v1-modal-egfr" placeholder="e.g. 82">
+            <div class="form-hint">Metformin contraindicated if &lt;30</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Clinical Notes</label>
+          <textarea id="v1-modal-met-notes" placeholder="e.g. Titrated to 1000 mg at week 4. Mild GI symptoms first 2 weeks. No hypoglycaemia reported."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSubjectModal('v1')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSubjectModal('v1')">Save &amp; Update</button>
+    </div>
   </div>
 </div>
 
@@ -2277,7 +2584,9 @@ function processData(rows, fileName, vid) {
   const id = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,5);
   const color = (vid === 'v2' ? DARK_COLORS : USER_COLORS)[st.users.length % 8];
   const name = fileName.replace(/\.csv$/i,'');
-  st.users.push({ id, name, color, data: parsed, hidden: false, filters: { range:'7d', tod:'all', alert:'all' } });
+  st.users.push({ id, name, color, data: parsed, hidden: false,
+    metformin: { enabled: false, startDate: null, doseStart: '', doseNow: '', hba1cPre: '', hba1cPost: '', bmi: '', egfr: '', notes: '' },
+    filters: { range:'7d', tod:'all', alert:'all' } });
 
   const totalSkip = skipped.oor + skipped.nphy + skipped.bad + skipped.date;
   showDashboard(vid, id, { fileName, timeKey, valKey, total: rows.length, valid: parsed.length, totalSkip, skipped });
@@ -2327,12 +2636,20 @@ function renderSubjects(vid) {
   const st = STATE[vid];
   if (vid === 'v1') {
     const container = $('v1-subject-list');
-    container.innerHTML = st.users.map(u => `
+    container.innerHTML = st.users.map(u => {
+      const met = u.metformin;
+      const metBadge = met?.enabled && met?.startDate
+        ? `<span class="subject-met-badge ${u.id === st.activeId ? 'met-badge-on' : 'met-badge-pre'}" title="Metformin tracking enabled · start: ${met.startDate}">MET</span>`
+        : '';
+      return `
       <div class="subject-chip ${u.id === st.activeId ? 'active' : ''}" onclick="setActiveUser('v1','${u.id}')">
         <div class="subject-dot" style="background:${u.color}"></div>
         <span class="subject-name" title="${u.name}">${u.name}</span>
-        <button class="subject-remove" onclick="event.stopPropagation();removeUser('v1','${u.id}')" title="Remove">✕</button>
-      </div>`).join('');
+        ${metBadge}
+        <button class="subject-settings" onclick="event.stopPropagation();openSubjectModal('v1','${u.id}')" title="Subject settings">⚙</button>
+        <button class="subject-remove" onclick="event.stopPropagation();removeUser('v1','${u.id}')" title="Remove subject">✕</button>
+      </div>`;
+    }).join('');
     const tabs = $('v1-user-tabs');
     tabs.innerHTML = '';
     if (st.users.length <= 1) tabs.style.display = 'none';
@@ -2625,6 +2942,98 @@ function updateResearchMetrics(vid) {
   setTgt('v1-r-tar1-pct', tar1pct, 25, true);
   setTgt('v1-r-tar2-pct', tar2pct, 5,  true);
 
+  // Before/After comparison for active user
+  const activeUser = STATE[vid].users.find(u => u.id === STATE[vid].activeId);
+  const met = activeUser?.metformin;
+  const baSection = $('v1-ba-section');
+  if (baSection) {
+    if (met?.enabled && met?.startDate) {
+      baSection.style.display = 'block';
+      const startDt  = new Date(met.startDate + 'T00:00:00');
+      const preData  = activeUser.data.filter(d => d.datetime < startDt);
+      const onData   = activeUser.data.filter(d => d.datetime >= startDt);
+      const preF     = preData.filter(d => d.value >= 20 && d.value <= 700);
+      const onF      = onData.filter(d => d.value >= 20 && d.value <= 700);
+      const preDays  = new Set(preF.map(d => toDate(d.datetime))).size;
+      const onDays   = new Set(onF.map(d => toDate(d.datetime))).size;
+
+      $('v1-ba-pre-days').textContent = `${preDays} days · ${preF.length} readings`;
+      $('v1-ba-on-days').textContent  = `${onDays} days · ${onF.length} readings`;
+
+      // Dose info notice
+      const doseStr = met.doseStart ? `${met.doseStart}${met.doseNow && met.doseNow !== met.doseStart ? ' → ' + met.doseNow : ''}` : '';
+      const hba1cStr = (met.hba1cPre || met.hba1cPost) ? ` · Lab HbA1c: ${met.hba1cPre || '?'}% → ${met.hba1cPost || '?'}%` : '';
+      $('v1-ba-notice-text').textContent =
+        `${activeUser.name} · Metformin started ${met.startDate}` +
+        (doseStr ? ` · Dose: ${doseStr}` : '') + hba1cStr;
+
+      const calcStats = (d) => {
+        if (!d.length) return null;
+        const vs  = d.map(x => x.value);
+        const avg = vs.reduce((a,b) => a+b,0) / vs.length;
+        const sd  = Math.sqrt(vs.map(v => (v-avg)**2).reduce((a,b) => a+b,0) / vs.length);
+        return {
+          avg, sd,
+          cv:  (sd / avg * 100),
+          gmi: (3.31 + 0.02392 * avg),
+          tir: (vs.filter(v => v >= 70 && v <= 180).length / vs.length * 100),
+          tbr: (vs.filter(v => v < 70).length / vs.length * 100),
+          tar: (vs.filter(v => v > 180).length / vs.length * 100),
+          fastAvg: (() => { const f = d.filter(x => { const h = x.datetime.getHours(); return h >= 6 && h < 10; }); return f.length ? f.reduce((a,b) => a + b.value,0)/f.length : null; })()
+        };
+      };
+      const pre = calcStats(preF);
+      const on  = calcStats(onF);
+
+      const renderBACol = (stats, el) => {
+        if (!stats) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:16px 0">Not enough data</div>'; return; }
+        el.innerHTML = `
+          ${met.hba1cPre || met.hba1cPost ? `<div class="ba-dose-row"><strong>Lab HbA1c:</strong> ${el.id.includes('pre') ? (met.hba1cPre || '—') : (met.hba1cPost || '—')}%</div>` : ''}
+          ${met.bmi ? `<div class="ba-dose-row"><strong>BMI:</strong> ${met.bmi} kg/m²${met.egfr ? `  <strong>eGFR:</strong> ${met.egfr} mL/min` : ''}</div>` : ''}
+          <div class="ba-metric-row"><span class="ba-metric-label">Avg Glucose</span><span class="ba-metric-value">${stats.avg.toFixed(1)} <span style="font-size:10px;color:var(--muted)">mg/dL</span></span></div>
+          <div class="ba-metric-row"><span class="ba-metric-label">GMI</span><span class="ba-metric-value">${stats.gmi.toFixed(1)}%</span></div>
+          <div class="ba-metric-row"><span class="ba-metric-label">CV</span><span class="ba-metric-value">${stats.cv.toFixed(1)}%</span></div>
+          <div class="ba-metric-row"><span class="ba-metric-label">Std Dev</span><span class="ba-metric-value">${stats.sd.toFixed(1)} mg/dL</span></div>
+          <div class="ba-metric-row"><span class="ba-metric-label">TIR (70–180)</span><span class="ba-metric-value">${stats.tir.toFixed(1)}%</span></div>
+          <div class="ba-metric-row"><span class="ba-metric-label">TBR (&lt;70)</span><span class="ba-metric-value">${stats.tbr.toFixed(1)}%</span></div>
+          <div class="ba-metric-row"><span class="ba-metric-label">TAR (&gt;180)</span><span class="ba-metric-value">${stats.tar.toFixed(1)}%</span></div>
+          <div class="ba-metric-row"><span class="ba-metric-label">Fasting (6–10AM)</span><span class="ba-metric-value">${stats.fastAvg !== null ? stats.fastAvg.toFixed(1) + ' mg/dL' : '—'}</span></div>`;
+      };
+
+      const preMetrics = $('v1-ba-pre-metrics');
+      const onMetrics  = $('v1-ba-on-metrics');
+      renderBACol(pre, preMetrics);
+      if (onMetrics) {
+        if (!on) { onMetrics.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:16px 0">No post-start data in range</div>'; }
+        else {
+          // Add delta badges to "on" column
+          const delta = (onVal, preVal, lowerIsBetter) => {
+            if (preVal === null || onVal === null) return '';
+            const d = onVal - preVal;
+            if (Math.abs(d) < 0.5) return `<span class="ba-delta ba-neutral">→ ${d > 0 ? '+' : ''}${d.toFixed(1)}</span>`;
+            const improved = lowerIsBetter ? d < 0 : d > 0;
+            return `<span class="ba-delta ${improved ? 'ba-improve' : 'ba-worsen'}">${d > 0 ? '+' : ''}${d.toFixed(1)}</span>`;
+          };
+          onMetrics.innerHTML = `
+            ${(met.hba1cPre || met.hba1cPost) ? `<div class="ba-dose-row"><strong>Lab HbA1c:</strong> ${met.hba1cPost || '—'}%${met.hba1cPre && met.hba1cPost ? ` <span class="ba-delta ${parseFloat(met.hba1cPost) < parseFloat(met.hba1cPre) ? 'ba-improve' : 'ba-worsen'}">${(parseFloat(met.hba1cPost)-parseFloat(met.hba1cPre)).toFixed(1) > 0 ? '+' : ''}${(parseFloat(met.hba1cPost)-parseFloat(met.hba1cPre)).toFixed(1)}</span>` : ''}</div>` : ''}
+            ${met.bmi ? `<div class="ba-dose-row"><strong>Dose:</strong> ${met.doseStart || '?'}${met.doseNow && met.doseNow !== met.doseStart ? ' → ' + met.doseNow : ''}</div>` : ''}
+            <div class="ba-metric-row"><span class="ba-metric-label">Avg Glucose</span><div class="ba-right"><span class="ba-metric-value">${on.avg.toFixed(1)} mg/dL</span>${delta(on.avg, pre?.avg, true)}</div></div>
+            <div class="ba-metric-row"><span class="ba-metric-label">GMI</span><div class="ba-right"><span class="ba-metric-value">${on.gmi.toFixed(1)}%</span>${delta(on.gmi, pre?.gmi, true)}</div></div>
+            <div class="ba-metric-row"><span class="ba-metric-label">CV</span><div class="ba-right"><span class="ba-metric-value">${on.cv.toFixed(1)}%</span>${delta(on.cv, pre?.cv, true)}</div></div>
+            <div class="ba-metric-row"><span class="ba-metric-label">Std Dev</span><div class="ba-right"><span class="ba-metric-value">${on.sd.toFixed(1)} mg/dL</span>${delta(on.sd, pre?.sd, true)}</div></div>
+            <div class="ba-metric-row"><span class="ba-metric-label">TIR (70–180)</span><div class="ba-right"><span class="ba-metric-value">${on.tir.toFixed(1)}%</span>${delta(on.tir, pre?.tir, false)}</div></div>
+            <div class="ba-metric-row"><span class="ba-metric-label">TBR (&lt;70)</span><div class="ba-right"><span class="ba-metric-value">${on.tbr.toFixed(1)}%</span>${delta(on.tbr, pre?.tbr, true)}</div></div>
+            <div class="ba-metric-row"><span class="ba-metric-label">TAR (&gt;180)</span><div class="ba-right"><span class="ba-metric-value">${on.tar.toFixed(1)}%</span>${delta(on.tar, pre?.tar, true)}</div></div>
+            <div class="ba-metric-row"><span class="ba-metric-label">Fasting (6–10AM)</span><div class="ba-right"><span class="ba-metric-value">${on.fastAvg !== null ? on.fastAvg.toFixed(1) + ' mg/dL' : '—'}</span>${on.fastAvg !== null && pre?.fastAvg !== null ? delta(on.fastAvg, pre.fastAvg, true) : ''}</div></div>`;
+        }
+      }
+      // Week-relative chart
+      if ($('v1-view-research')?.classList.contains('active')) buildWeekRelativeChart(vid, activeUser);
+    } else {
+      baSection.style.display = 'none';
+    }
+  }
+
   // Build research charts only when research panel is active
   if ($('v1-view-research')?.classList.contains('active')) {
     buildAGPChart(vid, data);
@@ -2752,73 +3161,287 @@ function buildTIRTrendChart(vid, data) {
   });
 }
 
+function buildWeekRelativeChart(vid, user) {
+  destroyChart(vid, 'week-rel');
+  if (!user?.metformin?.startDate) return;
+  const { tickColor, gridColor, monoFont } = chartDefaults(vid);
+  const startDt = new Date(user.metformin.startDate + 'T00:00:00');
+
+  // Assign each reading to a week offset from start (week 0 = start week)
+  const weekBuckets = {};
+  user.data.forEach(d => {
+    const diffMs = d.datetime - startDt;
+    const wk = Math.floor(diffMs / (7 * 86400000));
+    if (!weekBuckets[wk]) weekBuckets[wk] = [];
+    weekBuckets[wk].push(d.value);
+  });
+
+  const weeks  = Object.keys(weekBuckets).map(Number).sort((a,b) => a-b);
+  const labels = weeks.map(w => w === 0 ? 'Wk 0\n(start)' : `Wk ${w > 0 ? '+' : ''}${w}`);
+  const avgs   = weeks.map(w => { const vs = weekBuckets[w]; return vs.reduce((a,b) => a+b,0)/vs.length; });
+  const colors = weeks.map(w => w < 0 ? 'rgba(180,83,9,0.65)' : 'rgba(5,150,105,0.65)');
+  const borderColors = weeks.map(w => w < 0 ? '#b45309' : '#059669');
+
+  const ctx = $(vid + '-week-rel-chart').getContext('2d');
+  const zeroIdx = weeks.indexOf(0);
+
+  const vertLinePlugin = {
+    id: 'weekZeroLine',
+    afterDraw(chart) {
+      if (zeroIdx < 0) return;
+      const xScale = chart.scales.x;
+      const xPx = xScale.getPixelForValue(zeroIdx);
+      const ctx2 = chart.ctx;
+      ctx2.save();
+      ctx2.strokeStyle = '#7c3aed';
+      ctx2.lineWidth = 1.5;
+      ctx2.setLineDash([5,4]);
+      ctx2.beginPath();
+      ctx2.moveTo(xPx, chart.chartArea.top);
+      ctx2.lineTo(xPx, chart.chartArea.bottom);
+      ctx2.stroke();
+      ctx2.fillStyle = '#7c3aed';
+      ctx2.font = `bold 9px IBM Plex Mono`;
+      ctx2.textAlign = 'center';
+      ctx2.fillText('MET START', xPx, chart.chartArea.top - 4);
+      ctx2.restore();
+    }
+  };
+
+  STATE[vid].charts['week-rel'] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: avgs, backgroundColor: colors, borderColor: borderColors, borderWidth: 1.5, borderRadius: 4, borderSkipped: false }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.parsed.y.toFixed(1)} mg/dL avg` } } },
+      scales: {
+        x: { ticks: { color: tickColor, font: { family: monoFont, size: 8 }, maxRotation: 0 }, grid: { display: false } },
+        y: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, callback: v => v + ' mg/dL' }, grid: { color: gridColor }, suggestedMin: 60, suggestedMax: 220 }
+      }
+    },
+    plugins: [vertLinePlugin]
+  });
+}
+
+function calcSubjectStats(u) {
+  const vs  = u.data.map(d => d.value);
+  const n   = vs.length;
+  if (!n) return null;
+  const avg = vs.reduce((a,b) => a+b, 0) / n;
+  const sd  = Math.sqrt(vs.map(v => (v-avg)**2).reduce((a,b) => a+b, 0) / n);
+  return {
+    n, avg, sd,
+    cv:  (sd / avg * 100),
+    gmi: (3.31 + 0.02392 * avg),
+    tir: (vs.filter(v => v >= 70 && v <= 180).length / n * 100),
+    tbr: (vs.filter(v => v < 70).length / n * 100),
+    tar: (vs.filter(v => v > 180).length / n * 100),
+    fastAvg: (() => { const f = u.data.filter(d => { const h = d.datetime.getHours(); return h >= 6 && h < 10; }); return f.length ? f.reduce((a,b) => a + b.value,0)/f.length : null; })(),
+    days: new Set(u.data.map(d => toDate(d.datetime))).size
+  };
+}
+
 function updateResearchTable(vid) {
   if (vid !== 'v1') return;
-  const st  = STATE[vid];
+  const st    = STATE[vid];
   const tbody = $('v1-research-table-body');
   if (!tbody || !st.users.length) return;
 
-  tbody.innerHTML = st.users.map(u => {
-    const vs  = u.data.map(d => d.value);
-    const n   = vs.length;
-    const avg = vs.reduce((a,b) => a+b, 0) / n;
-    const sd  = Math.sqrt(vs.map(v => (v-avg)**2).reduce((a,b) => a+b, 0) / n);
-    const cv  = (sd / avg * 100).toFixed(1);
-    const gmi = (3.31 + 0.02392 * avg).toFixed(1);
-    const tir = (vs.filter(v => v >= 70 && v <= 180).length / n * 100).toFixed(1);
-    const tbr = (vs.filter(v => v < 70).length / n * 100).toFixed(1);
-    const tar = (vs.filter(v => v > 180).length / n * 100).toFixed(1);
-    const fastRdgs = u.data.filter(d => { const h = d.datetime.getHours(); return h >= 6 && h < 10; });
-    const fastAvg  = fastRdgs.length ? (fastRdgs.reduce((a,b) => a + b.value, 0) / fastRdgs.length).toFixed(1) : '—';
-    const days = new Set(u.data.map(d => toDate(d.datetime))).size;
-    const isActive = u.id === st.activeId;
+  const anyMet = st.users.some(u => u.metformin?.enabled && u.metformin?.startDate);
 
-    const tirColor  = parseFloat(tir) >= 70 ? 'var(--green)' : parseFloat(tir) >= 50 ? 'var(--amber)' : 'var(--red)';
-    const tbrColor  = parseFloat(tbr) <= 4  ? 'var(--green)' : 'var(--red)';
-    const tarColor  = parseFloat(tar) <= 25 ? 'var(--green)' : 'var(--amber)';
-    const gmiColor  = parseFloat(gmi) < 7   ? 'var(--green)' : 'var(--red)';
+  tbody.innerHTML = st.users.map(u => {
+    const s = calcSubjectStats(u);
+    if (!s) return '';
+    const isActive = u.id === st.activeId;
+    const tirColor = s.tir >= 70 ? 'var(--green)' : s.tir >= 50 ? 'var(--amber)' : 'var(--red)';
+    const tbrColor = s.tbr <= 4  ? 'var(--green)' : 'var(--red)';
+    const tarColor = s.tar <= 25 ? 'var(--green)' : 'var(--amber)';
+    const gmiColor = s.gmi < 7   ? 'var(--green)' : 'var(--red)';
+
+    let metCols = '';
+    if (anyMet) {
+      const met = u.metformin;
+      if (met?.enabled && met?.startDate) {
+        const startDt = new Date(met.startDate + 'T00:00:00');
+        const prePts  = u.data.filter(d => d.datetime < startDt);
+        const onPts   = u.data.filter(d => d.datetime >= startDt);
+        const preAvg  = prePts.length ? (prePts.reduce((a,b) => a + b.value,0)/prePts.length).toFixed(1) : '—';
+        const onAvg   = onPts.length  ? (onPts.reduce((a,b)  => a + b.value,0)/onPts.length).toFixed(1)  : '—';
+        const preTir  = prePts.length ? (prePts.filter(d => d.value >= 70 && d.value <= 180).length/prePts.length*100).toFixed(1) : '—';
+        const onTir   = onPts.length  ? (onPts.filter(d  => d.value >= 70 && d.value <= 180).length/onPts.length*100).toFixed(1)  : '—';
+        const delta   = (preAvg !== '—' && onAvg !== '—') ? (parseFloat(onAvg) - parseFloat(preAvg)).toFixed(1) : '';
+        const dSign   = delta ? (parseFloat(delta) < 0 ? `<span style="color:var(--green)">${delta}</span>` : `<span style="color:var(--amber)">+${delta}</span>`) : '';
+        metCols = `<td style="font-family:var(--font-mono)">${preAvg}</td><td style="font-family:var(--font-mono)">${onAvg} ${dSign}</td><td style="font-family:var(--font-mono)">${preTir}%</td><td style="font-family:var(--font-mono)">${onTir}%</td>`;
+      } else {
+        metCols = `<td colspan="4" style="color:var(--muted);font-size:10px">No treatment period set — click ⚙ on subject</td>`;
+      }
+    }
 
     return `<tr style="${isActive ? 'background:var(--accent-bg)' : ''}">
-      <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${u.color};display:inline-block;flex-shrink:0"></span>${u.name}</span></td>
-      <td>${n.toLocaleString()}</td>
-      <td>${avg.toFixed(1)}</td>
-      <td style="color:${gmiColor};font-weight:600">${gmi}</td>
-      <td>${cv}</td>
-      <td>${sd.toFixed(1)}</td>
-      <td style="color:${tirColor};font-weight:600">${tir}</td>
-      <td style="color:${tbrColor};font-weight:600">${tbr}</td>
-      <td style="color:${tarColor};font-weight:600">${tar}</td>
-      <td>${fastAvg}</td>
-      <td>${days}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:6px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${u.color};display:inline-block;flex-shrink:0"></span>${u.name}
+        ${u.metformin?.enabled ? '<span class="subject-met-badge met-badge-on" style="margin-left:2px">MET</span>' : ''}
+      </span></td>
+      <td>${s.n.toLocaleString()}</td>
+      <td>${s.avg.toFixed(1)}</td>
+      <td style="color:${gmiColor};font-weight:600">${s.gmi.toFixed(1)}</td>
+      <td>${s.cv.toFixed(1)}</td>
+      <td>${s.sd.toFixed(1)}</td>
+      <td style="color:${tirColor};font-weight:600">${s.tir.toFixed(1)}</td>
+      <td style="color:${tbrColor};font-weight:600">${s.tbr.toFixed(1)}</td>
+      <td style="color:${tarColor};font-weight:600">${s.tar.toFixed(1)}</td>
+      <td>${s.fastAvg !== null ? s.fastAvg.toFixed(1) : '—'}</td>
+      <td>${s.days}</td>
+      ${metCols}
     </tr>`;
   }).join('');
+
+  // Update thead to include pre/post columns when any subject has metformin
+  const thead = tbody.closest('table')?.querySelector('thead tr');
+  if (thead) {
+    const existing = thead.querySelectorAll('.met-col');
+    existing.forEach(c => c.remove());
+    if (anyMet) {
+      ['Pre Avg','On Avg','Pre TIR','On TIR'].forEach(label => {
+        const th = document.createElement('th');
+        th.className = 'met-col';
+        th.title = label.includes('Avg') ? 'Mean glucose mg/dL' : 'Time in range 70–180%';
+        th.textContent = label;
+        thead.appendChild(th);
+      });
+    }
+  }
 }
 
 function exportResearchCSV(vid) {
   const st = STATE[vid];
   if (!st.users.length) return alert('No data loaded.');
-  const headers = ['Subject','Readings','Avg_mgdL','GMI_pct','CV_pct','SD_mgdL','TIR_pct','TBR_pct','TAR_pct','Fasting_Avg_mgdL','Days'];
+  const anyMet = st.users.some(u => u.metformin?.enabled && u.metformin?.startDate);
+  const base = ['Subject','Readings','Avg_mgdL','GMI_pct','CV_pct','SD_mgdL','TIR_pct','TBR_pct','TAR_pct','Fasting_Avg_mgdL','Days'];
+  const metHdrs = anyMet ? ['Met_StartDate','Pre_Readings','Pre_Avg_mgdL','Pre_GMI','Pre_TIR_pct','Post_Readings','Post_Avg_mgdL','Post_GMI','Post_TIR_pct','Dose_Start','Dose_Now','HbA1c_Pre','HbA1c_Post','BMI','eGFR','Notes'] : [];
+  const headers = [...base, ...metHdrs];
+
   const rows = st.users.map(u => {
-    const vs  = u.data.map(d => d.value);
-    const n   = vs.length;
-    const avg = vs.reduce((a,b) => a+b, 0) / n;
-    const sd  = Math.sqrt(vs.map(v => (v-avg)**2).reduce((a,b) => a+b, 0) / n);
-    const cv  = (sd / avg * 100).toFixed(1);
-    const gmi = (3.31 + 0.02392 * avg).toFixed(1);
-    const tir = (vs.filter(v => v >= 70 && v <= 180).length / n * 100).toFixed(1);
-    const tbr = (vs.filter(v => v < 70).length / n * 100).toFixed(1);
-    const tar = (vs.filter(v => v > 180).length / n * 100).toFixed(1);
-    const fastRdgs = u.data.filter(d => { const h = d.datetime.getHours(); return h >= 6 && h < 10; });
-    const fastAvg  = fastRdgs.length ? (fastRdgs.reduce((a,b) => a + b.value, 0) / fastRdgs.length).toFixed(1) : '';
-    const days = new Set(u.data.map(d => toDate(d.datetime))).size;
-    return [u.name, n, avg.toFixed(1), gmi, cv, sd.toFixed(1), tir, tbr, tar, fastAvg, days].join(',');
-  });
+    const s = calcSubjectStats(u);
+    if (!s) return null;
+    const base = [u.name, s.n, s.avg.toFixed(1), s.gmi.toFixed(1), s.cv.toFixed(1), s.sd.toFixed(1),
+      s.tir.toFixed(1), s.tbr.toFixed(1), s.tar.toFixed(1),
+      s.fastAvg !== null ? s.fastAvg.toFixed(1) : '', s.days];
+    if (!anyMet) return base.join(',');
+
+    const met = u.metformin;
+    if (!met?.enabled || !met?.startDate) return [...base, ...Array(metHdrs.length).fill('')].join(',');
+
+    const startDt = new Date(met.startDate + 'T00:00:00');
+    const pre = u.data.filter(d => d.datetime < startDt);
+    const on  = u.data.filter(d => d.datetime >= startDt);
+    const statOf = (pts) => {
+      if (!pts.length) return ['', '', '', ''];
+      const vs = pts.map(d => d.value);
+      const a  = vs.reduce((x,y) => x+y,0)/vs.length;
+      const gmi = (3.31 + 0.02392 * a).toFixed(1);
+      const tir = (vs.filter(v => v >= 70 && v <= 180).length / vs.length * 100).toFixed(1);
+      return [pts.length, a.toFixed(1), gmi, tir];
+    };
+    const metCols = [met.startDate, ...statOf(pre), ...statOf(on),
+      met.doseStart, met.doseNow, met.hba1cPre, met.hba1cPost, met.bmi, met.egfr,
+      `"${(met.notes || '').replace(/"/g, '""')}"`];
+    return [...base, ...metCols].join(',');
+  }).filter(Boolean);
+
   const csv  = [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url; a.download = 'lingocgm_research_summary.csv'; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ─── SUBJECT MODAL ────────────────────────────
+let _modalVid = null, _modalUserId = null;
+
+function openSubjectModal(vid, userId) {
+  _modalVid = vid; _modalUserId = userId;
+  const st   = STATE[vid];
+  const user = st.users.find(u => u.id === userId);
+  if (!user) return;
+
+  const met = user.metformin;
+  const dates = user.data.map(d => d.datetime);
+  const minD  = new Date(Math.min(...dates));
+  const maxD  = new Date(Math.max(...dates));
+  const days  = Math.round((maxD - minD) / 86400000) + 1;
+
+  $('v1-modal-subject-name').textContent = user.name;
+  $('v1-modal-data-range').innerHTML =
+    `<strong>${user.name}</strong> &nbsp;·&nbsp; ${user.data.length.toLocaleString()} readings &nbsp;·&nbsp; ` +
+    `${toDate(minD)} → ${toDate(maxD)} &nbsp;·&nbsp; ${days} days`;
+
+  $('v1-modal-met-enabled').checked   = met.enabled;
+  $('v1-modal-met-start').value       = met.startDate || '';
+  $('v1-modal-met-dose-start').value  = met.doseStart || '';
+  $('v1-modal-met-dose-now').value    = met.doseNow   || '';
+  $('v1-modal-hba1c-pre').value       = met.hba1cPre  || '';
+  $('v1-modal-hba1c-post').value      = met.hba1cPost || '';
+  $('v1-modal-bmi').value             = met.bmi       || '';
+  $('v1-modal-egfr').value            = met.egfr      || '';
+  $('v1-modal-met-notes').value       = met.notes     || '';
+
+  updateModalPreview(vid);
+  $('v1-subject-modal-backdrop').classList.add('open');
+}
+
+function updateModalPreview(vid) {
+  const userId  = _modalUserId;
+  const user    = STATE[vid]?.users.find(u => u.id === userId);
+  if (!user) return;
+
+  const enabled = $('v1-modal-met-enabled').checked;
+  const fields  = $('v1-modal-met-fields');
+  fields.style.opacity  = enabled ? '1' : '0.4';
+  fields.style.pointerEvents = enabled ? '' : 'none';
+
+  const startVal = $('v1-modal-met-start').value;
+  const preview  = $('v1-modal-met-preview');
+  if (!enabled || !startVal) { preview.innerHTML = ''; return; }
+
+  const startDt = new Date(startVal + 'T00:00:00');
+  const preCnt  = user.data.filter(d => d.datetime < startDt).length;
+  const onCnt   = user.data.filter(d => d.datetime >= startDt).length;
+  const preDays = new Set(user.data.filter(d => d.datetime < startDt).map(d => toDate(d.datetime))).size;
+  const onDays  = new Set(user.data.filter(d => d.datetime >= startDt).map(d => toDate(d.datetime))).size;
+
+  if (preCnt === 0 && onCnt === 0) { preview.innerHTML = '<span style="color:var(--red)">Date outside data range</span>'; return; }
+  preview.innerHTML =
+    `<span class="pre-span">Pre-metformin: ${preCnt} readings · ${preDays} days</span> &nbsp;/&nbsp; ` +
+    `<span class="on-span">On metformin: ${onCnt} readings · ${onDays} days</span>`;
+}
+
+function saveSubjectModal(vid) {
+  const user = STATE[vid]?.users.find(u => u.id === _modalUserId);
+  if (!user) return;
+  user.metformin = {
+    enabled:   $('v1-modal-met-enabled').checked,
+    startDate: $('v1-modal-met-start').value || null,
+    doseStart: $('v1-modal-met-dose-start').value.trim(),
+    doseNow:   $('v1-modal-met-dose-now').value.trim(),
+    hba1cPre:  $('v1-modal-hba1c-pre').value.trim(),
+    hba1cPost: $('v1-modal-hba1c-post').value.trim(),
+    bmi:       $('v1-modal-bmi').value.trim(),
+    egfr:      $('v1-modal-egfr').value.trim(),
+    notes:     $('v1-modal-met-notes').value.trim(),
+  };
+  closeSubjectModal(vid);
+  renderSubjects(vid);
+  // Refresh charts and research metrics
+  rebuildLineChart(vid);
+  if ($('v1-view-research')?.classList.contains('active')) updateResearchMetrics(vid);
+  else updateResearchMetrics(vid); // keeps numbers fresh even if panel hidden
+}
+
+function closeSubjectModal(vid) {
+  $(`${vid}-subject-modal-backdrop`).classList.remove('open');
+  _modalVid = null; _modalUserId = null;
 }
 
 // ─── CHARTS ───────────────────────────────────
@@ -2895,6 +3518,37 @@ function rebuildLineChart(vid) {
     });
   }
 
+  // Build metformin start-date annotation plugin for active user
+  const activeUser = st.users.find(u => u.id === st.activeId);
+  const metDate = (!overlay && activeUser?.metformin?.enabled && activeUser?.metformin?.startDate)
+    ? new Date(activeUser.metformin.startDate + 'T00:00:00') : null;
+
+  const metAnnotationPlugin = {
+    id: 'metLine',
+    afterDraw(chart) {
+      if (!metDate) return;
+      const xScale = chart.scales.x;
+      const xPx = xScale.getPixelForValue(metDate.getTime());
+      if (xPx < chart.chartArea.left || xPx > chart.chartArea.right) return;
+      const ctx2 = chart.ctx;
+      ctx2.save();
+      ctx2.strokeStyle = '#7c3aed';
+      ctx2.lineWidth = 1.5;
+      ctx2.setLineDash([5, 4]);
+      ctx2.beginPath();
+      ctx2.moveTo(xPx, chart.chartArea.top);
+      ctx2.lineTo(xPx, chart.chartArea.bottom);
+      ctx2.stroke();
+      ctx2.fillStyle = '#7c3aed';
+      ctx2.font = `bold 9px IBM Plex Mono`;
+      ctx2.textAlign = 'left';
+      ctx2.fillText('▶ Metformin start', xPx + 4, chart.chartArea.top + 12);
+      const dose = activeUser.metformin.doseStart;
+      if (dose) ctx2.fillText(dose, xPx + 4, chart.chartArea.top + 23);
+      ctx2.restore();
+    }
+  };
+
   const ctx = $(vid + '-line-chart').getContext('2d');
   STATE[vid].charts.line = new Chart(ctx, {
     type: 'line',
@@ -2914,7 +3568,8 @@ function rebuildLineChart(vid) {
         x: { type:'time', time:{ tooltipFormat:'MMM d HH:mm' }, ticks:{ color:tickColor, maxTicksLimit:8, font:{family:monoFont,size:9} }, grid:{ color:gridColor } },
         y: { ticks:{ color:tickColor, font:{family:monoFont,size:9}, callback:v=>v }, grid:{ color:gridColor }, suggestedMin:40, suggestedMax:250 }
       }
-    }
+    },
+    plugins: [metAnnotationPlugin]
   });
 }
 
