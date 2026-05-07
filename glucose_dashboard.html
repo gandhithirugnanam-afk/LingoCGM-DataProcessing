@@ -590,19 +590,47 @@ tr.row-low:hover td { background: rgba(239,68,68,0.12); }
 /* ── MISC ── */
 .section-spacer { height: 8px; }
 
-.file-info {
-  display: none;
+/* ── USER TABS ── */
+.user-tabs { display: none; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+.user-tab {
+  display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--muted);
-  padding: 8px 14px;
-  border-radius: 8px;
-  background: var(--surface2);
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 20px;
   border: 1px solid var(--border);
+  background: var(--surface2);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition);
 }
 
-.file-info .file-name { color: var(--accent2); font-family: var(--font-mono); }
+.user-tab.active { border-color: var(--user-color, var(--accent)); box-shadow: 0 0 0 1px var(--user-color, var(--accent)) inset; }
+.user-tab:hover:not(.active) { border-color: var(--user-color, var(--accent)); }
+
+.user-tab-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.user-tab-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.user-tab-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color var(--transition);
+}
+.user-tab-remove:hover { color: var(--red); }
 
 .empty-state {
   text-align: center;
@@ -655,11 +683,8 @@ tr.row-low:hover td { background: rgba(239,68,68,0.12); }
     <div class="logo-text">Gluco<span>View</span></div>
   </div>
   <nav>
-    <div class="file-info" id="file-info">
-      <span>📄</span>
-      <span class="file-name" id="file-name-display">—</span>
-      <button class="btn btn-sm" onclick="resetDashboard()">✕ Remove</button>
-    </div>
+    <div class="user-tabs" id="user-tabs"></div>
+    <button class="btn btn-sm" id="add-user-btn" style="display:none" onclick="document.getElementById('csv-input').click()">+ Add User</button>
     <button class="btn btn-sm" id="export-csv-btn" style="display:none" onclick="exportCSV()">⬇ CSV</button>
     <button class="btn btn-sm" id="export-excel-btn" style="display:none" onclick="exportExcel()">⬇ Excel</button>
     <button class="btn btn-ghost btn-sm" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
@@ -672,7 +697,7 @@ tr.row-low:hover td { background: rgba(239,68,68,0.12); }
     <span class="upload-icon">📊</span>
     <h2>Drop your CGM export here</h2>
     <p>Drag & drop a CSV file, or click to browse.<br>Your data never leaves your browser.</p>
-    <input type="file" id="csv-input" accept=".csv" onchange="handleFile(this.files[0])">
+    <input type="file" id="csv-input" accept=".csv" multiple onchange="handleFiles(this.files)">
   </div>
 
   <div class="preview-strip" id="preview-strip"></div>
@@ -878,7 +903,10 @@ tr.row-low:hover td { background: rgba(239,68,68,0.12); }
 // ════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════
-let allData = [];        // {datetime: Date, value: number}[]
+const USER_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
+let users = [];          // { id, name, color, data: {datetime, value}[] }
+let activeUserId = null;
+let allData = [];        // alias to active user's data
 let filteredData = [];
 let sortCol = 'datetime';
 let sortDir = 'desc';
@@ -894,18 +922,20 @@ uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag
 uploadZone.addEventListener('drop', e => {
   e.preventDefault();
   uploadZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file) handleFile(file);
+  const files = e.dataTransfer.files;
+  if (files.length) handleFiles(files);
 });
+
+function handleFiles(files) {
+  Array.from(files).forEach(file => handleFile(file));
+}
 
 function handleFile(file) {
   if (!file || !file.name.endsWith('.csv')) {
-    alert('Please upload a .csv file.');
+    alert('Please upload .csv files only.');
     return;
   }
   showLoading(true);
-  document.getElementById('file-name-display').textContent = file.name;
-
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
@@ -921,7 +951,7 @@ function handleFile(file) {
 }
 
 function processData(rows, fileName) {
-  allData = [];
+  const parsed = [];
 
   // Detect column names flexibly
   const sampleRow = rows[0] || {};
@@ -929,7 +959,7 @@ function processData(rows, fileName) {
   const timeKey = keys.find(k => k.toLowerCase().includes('time') || k.toLowerCase().includes('date')) || keys[0];
   const valKey  = keys.find(k => k.toLowerCase().includes('measure') || k.toLowerCase().includes('mg') || k.toLowerCase().includes('glucose')) || keys[1];
 
-  // Show preview
+  // Show preview for most-recently-added user
   showPreview(rows.slice(0, 5), timeKey, valKey);
 
   rows.forEach(row => {
@@ -939,30 +969,72 @@ function processData(rows, fileName) {
     if (isNaN(num)) return;
     const dt = new Date(row[timeKey]);
     if (isNaN(dt.getTime())) return;
-    allData.push({ datetime: dt, value: num });
+    parsed.push({ datetime: dt, value: num });
   });
 
-  if (allData.length === 0) {
-    alert('No valid readings found. Check column names match expected format.');
+  if (parsed.length === 0) {
+    alert(`No valid readings found in "${fileName}". Check column names match expected format.`);
     return;
   }
 
-  allData.sort((a, b) => a.datetime - b.datetime);
+  parsed.sort((a, b) => a.datetime - b.datetime);
 
-  // Show dashboard
-  document.getElementById('upload-section').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
-  document.getElementById('file-info').style.display = 'flex';
-  document.getElementById('export-csv-btn').style.display = 'inline-flex';
-  document.getElementById('export-excel-btn').style.display = 'inline-flex';
+  const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  const color = USER_COLORS[users.length % USER_COLORS.length];
+  const name = fileName.replace(/\.csv$/i, '');
+  users.push({ id, name, color, data: parsed });
 
-  // Set default date range inputs
+  // Reveal dashboard on first user
+  if (users.length === 1) {
+    document.getElementById('upload-section').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('export-csv-btn').style.display = 'inline-flex';
+    document.getElementById('export-excel-btn').style.display = 'inline-flex';
+    document.getElementById('add-user-btn').style.display = 'inline-flex';
+  }
+
+  setActiveUser(id);
+}
+
+function setActiveUser(id) {
+  activeUserId = id;
+  const user = users.find(u => u.id === id);
+  allData = user.data;
+
   const first = allData[0].datetime;
   const last  = allData[allData.length - 1].datetime;
   document.getElementById('date-from').value = toInputDate(first);
   document.getElementById('date-to').value   = toInputDate(last);
 
+  renderUserTabs();
   applyFilters();
+}
+
+function renderUserTabs() {
+  const container = document.getElementById('user-tabs');
+  container.style.display = users.length ? 'flex' : 'none';
+  container.innerHTML = users.map(u => `
+    <div class="user-tab ${u.id === activeUserId ? 'active' : ''}"
+         style="--user-color:${u.color}"
+         onclick="setActiveUser('${u.id}')">
+      <span class="user-tab-dot" style="background:${u.color}"></span>
+      <span class="user-tab-name" title="${u.name}">${u.name}</span>
+      <button class="user-tab-remove" onclick="event.stopPropagation();removeUser('${u.id}')" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeUser(id) {
+  users = users.filter(u => u.id !== id);
+  if (users.length === 0) {
+    resetDashboard();
+    return;
+  }
+  if (activeUserId === id) {
+    setActiveUser(users[0].id);
+  } else {
+    renderUserTabs();
+  }
 }
 
 function showPreview(rows, timeKey, valKey) {
@@ -1424,10 +1496,12 @@ function toggleTheme() {
 // RESET
 // ════════════════════════════════════════════════
 function resetDashboard() {
-  allData = []; filteredData = [];
+  users = []; activeUserId = null; allData = []; filteredData = [];
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('upload-section').style.display = 'flex';
-  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('user-tabs').style.display = 'none';
+  document.getElementById('user-tabs').innerHTML = '';
+  document.getElementById('add-user-btn').style.display = 'none';
   document.getElementById('export-csv-btn').style.display = 'none';
   document.getElementById('export-excel-btn').style.display = 'none';
   document.getElementById('preview-strip').style.display = 'none';
