@@ -953,11 +953,29 @@ function handleFile(file) {
 function processData(rows, fileName) {
   const parsed = [];
 
-  // Detect column names flexibly
+  // Detect columns: keyword match, then numeric plausibility scan, then positional fallback
   const sampleRow = rows[0] || {};
   const keys = Object.keys(sampleRow);
-  const timeKey = keys.find(k => k.toLowerCase().includes('time') || k.toLowerCase().includes('date')) || keys[0];
-  const valKey  = keys.find(k => k.toLowerCase().includes('measure') || k.toLowerCase().includes('mg') || k.toLowerCase().includes('glucose')) || keys[1];
+
+  let timeKey = keys.find(k => k.toLowerCase().includes('time') || k.toLowerCase().includes('date'));
+  let valKey  = keys.find(k =>
+    k !== timeKey &&
+    (k.toLowerCase().includes('measure') || k.toLowerCase().includes('mg') || k.toLowerCase().includes('glucose'))
+  );
+
+  // Plausibility scan: pick the first column whose sampled values are numeric and in 30–700 mg/dL
+  if (!valKey) {
+    const sample = rows.slice(0, 20);
+    for (const key of keys) {
+      if (key === timeKey) continue;
+      const nums = sample.map(r => parseFloat(r[key])).filter(n => !isNaN(n));
+      if (nums.length > 0 && nums.every(n => n >= 30 && n <= 700)) { valKey = key; break; }
+    }
+  }
+
+  // Positional fallback
+  if (!timeKey) timeKey = keys[0];
+  if (!valKey)  valKey  = keys.find(k => k !== timeKey) || keys[1];
 
   // Show preview for most-recently-added user
   showPreview(rows.slice(0, 5), timeKey, valKey);
@@ -966,14 +984,14 @@ function processData(rows, fileName) {
     const rawVal = row[valKey];
     if (!rawVal || rawVal.toString().toLowerCase().includes('out of range') || rawVal.toString().toLowerCase() === 'low' || rawVal.toString().toLowerCase() === 'high') return;
     const num = parseFloat(rawVal);
-    if (isNaN(num)) return;
+    if (isNaN(num) || num < 20 || num > 700) return;   // reject non-physiological values
     const dt = new Date(row[timeKey]);
     if (isNaN(dt.getTime())) return;
     parsed.push({ datetime: dt, value: num });
   });
 
   if (parsed.length === 0) {
-    alert(`No valid readings found in "${fileName}". Check column names match expected format.`);
+    alert(`No valid glucose readings found in "${fileName}".\n\nDetected columns:\n  Time → "${timeKey}"\n  Glucose → "${valKey}"\n\nCheck these match your CSV headers.`);
     return;
   }
 
