@@ -1531,9 +1531,140 @@ tr:hover td { background: var(--surface2); }
 }
 .ba-dose-row strong { color: var(--text2); }
 
+/* ─── ZOOM BUTTONS ─── */
+.zoom-btn-group { display: flex; gap: 3px; align-items: center; }
+.zoom-btn {
+  width: 26px; height: 26px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--tr);
+  flex-shrink: 0;
+}
+.zoom-btn:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+/* ─── GLOSSARY POPUP ─── */
+.term-q {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 8px; font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  vertical-align: middle;
+  margin-left: 3px;
+  transition: all var(--tr);
+  flex-shrink: 0;
+}
+.term-q:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+#glossary-popup {
+  display: none;
+  position: fixed;
+  z-index: 8000;
+  max-width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  pointer-events: auto;
+}
+#glossary-popup.open { display: block; }
+.gp-term {
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  letter-spacing: 0.3px; margin-bottom: 6px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.gp-close { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 0; line-height: 1; }
+.gp-close:hover { color: var(--text); }
+.gp-def { font-size: 12px; line-height: 1.6; color: var(--text2); }
+.gp-formula { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 6px; padding: 5px 8px; background: var(--surface2); border-radius: 4px; }
+.gp-target { font-size: 10px; font-weight: 600; color: var(--green); margin-top: 6px; }
+
+/* ─── RESPONDER BADGES ─── */
+.responder-badge {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 20px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+}
+.r-responder  { background: var(--green-bg);  color: var(--green); }
+.r-partial    { background: var(--amber-bg);  color: var(--amber); }
+.r-non        { background: var(--red-bg);    color: var(--red); }
+.r-pending    { background: var(--surface2);  color: var(--muted); }
+
+/* ─── EFFECT SIZE / STATS BADGE ─── */
+.effect-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-family: var(--font-mono);
+  padding: 2px 7px; border-radius: 4px;
+  background: var(--purple-bg); color: var(--purple);
+  font-weight: 600;
+}
+.min-days-warn {
+  font-size: 10px; color: var(--amber); font-family: var(--font-mono);
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 6px;
+}
+
+/* ─── COHORT SUMMARY ROW ─── */
+.cohort-row td {
+  background: var(--surface2) !important;
+  font-weight: 600 !important;
+  border-top: 2px solid var(--border2) !important;
+}
+
+/* ─── WASHOUT NOTICE ─── */
+.washout-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 3px;
+  background: #f5f3ff; color: #7c3aed;
+  font-family: var(--font-mono);
+}
+
+/* ─── GLOSSARY LINK in header ─── */
+.glossary-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500;
+  color: var(--muted); cursor: pointer;
+  background: none; border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px 10px;
+  transition: all var(--tr);
+}
+.glossary-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
+
 </style>
 </head>
 <body>
+
+<!-- Glossary Popup -->
+<div id="glossary-popup">
+  <div class="gp-term">
+    <span id="gp-term-title"></span>
+    <button class="gp-close" onclick="hideTerm()">✕</button>
+  </div>
+  <div class="gp-def" id="gp-term-def"></div>
+  <div class="gp-formula" id="gp-term-formula" style="display:none"></div>
+  <div class="gp-target" id="gp-term-target" style="display:none"></div>
+</div>
+
+<!-- Glossary Panel (slide-over) -->
+<div id="glossary-panel" style="display:none;position:fixed;top:36px;right:0;bottom:0;width:340px;background:var(--surface);border-left:1px solid var(--border2);box-shadow:-4px 0 24px rgba(14,22,36,0.10);z-index:7000;overflow-y:auto;font-family:var(--font-sans)">
+  <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1">
+    <span style="font-size:14px;font-weight:700">Research Glossary</span>
+    <button onclick="document.getElementById('glossary-panel').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1">✕</button>
+  </div>
+  <div id="glossary-panel-body" style="padding:14px 18px;display:flex;flex-direction:column;gap:14px"></div>
+</div>
 
 <!-- Loading Overlay -->
 <div id="loading-overlay">
@@ -1766,6 +1897,10 @@ tr:hover td { background: var(--surface2); }
                   <span class="toggle-switch"><input type="checkbox" id="v1-overlay-toggle" onchange="rebuildLineChart('v1')"><span class="toggle-slider"></span></span>
                   <span style="font-size:11px;white-space:nowrap">Overlay all</span>
                 </label>
+                <div class="zoom-btn-group" title="Zoom controls">
+                  <button class="zoom-btn" onclick="zoomChart('v1','line',1.3)" title="Zoom in">+</button>
+                  <button class="zoom-btn" onclick="zoomChart('v1','line',0.7)" title="Zoom out">−</button>
+                </div>
                 <button class="btn btn-sm" onclick="resetZoom('v1')">Reset zoom</button>
               </div>
             </div>
@@ -1863,7 +1998,14 @@ tr:hover td { background: var(--surface2); }
           <div class="chart-card">
             <div class="chart-header">
               <div><div class="chart-title">Subject Overlay</div><div class="chart-subtitle">All subjects on shared timeline</div></div>
-              <div id="v1-cmp-pills" class="compare-pills" style="margin:0"></div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <div id="v1-cmp-pills" class="compare-pills" style="margin:0"></div>
+                <div class="zoom-btn-group">
+                  <button class="zoom-btn" onclick="zoomChart('v1','compare',1.3)" title="Zoom in">+</button>
+                  <button class="zoom-btn" onclick="zoomChart('v1','compare',0.7)" title="Zoom out">−</button>
+                  <button class="btn btn-sm" onclick="STATE['v1'].charts.compare?.resetZoom()" style="padding:4px 8px;font-size:11px">Reset</button>
+                </div>
+              </div>
             </div>
             <canvas id="v1-compare-chart" height="90"></canvas>
           </div>
@@ -1887,6 +2029,10 @@ tr:hover td { background: var(--surface2); }
               <div class="page-sub">Extended glycemic metrics for treatment evaluation — based on ADA/EASD CGM consensus standards</div>
             </div>
             <div class="btn-group">
+              <button class="glossary-btn" onclick="showGlossaryPanel()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Glossary
+              </button>
               <button class="btn btn-sm" onclick="exportResearchCSV('v1')">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export Research CSV
@@ -1896,7 +2042,12 @@ tr:hover td { background: var(--surface2); }
 
           <!-- Before/After Metformin Comparison (shown only when a subject has period tracking enabled) -->
           <div id="v1-ba-section" style="display:none">
-            <div class="research-section-title">Before / After Metformin Comparison <span class="section-badge">TREATMENT RESPONSE</span></div>
+            <div class="research-section-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              Before / After Metformin Comparison <span class="section-badge">TREATMENT RESPONSE</span>
+              <span id="v1-ba-responder-badge" style="display:none"></span>
+              <span id="v1-ba-effect-badge" style="display:none"></span>
+              <span id="v1-ba-days-warn" style="display:none"></span>
+            </div>
             <div class="ba-notice" id="v1-ba-notice">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <span id="v1-ba-notice-text">—</span>
@@ -1938,46 +2089,46 @@ tr:hover td { background: var(--surface2); }
           <div class="research-metrics-grid">
             <div class="metric-card mc-blue">
               <div class="metric-accent-line"></div>
-              <div class="metric-label">GMI</div>
+              <div class="metric-label">GMI <button class="term-q" onclick="showTerm(event,'GMI')">?</button></div>
               <div class="metric-value" id="v1-r-gmi">—</div>
               <div class="metric-unit">%</div>
-              <div class="metric-help">Glucose Management Indicator — HbA1c estimate from CGM mean glucose. Target &lt;7.0% for T2D on metformin.</div>
+              <div class="metric-help">Glucose Management Indicator. CGM-derived HbA1c estimate. Target &lt;7.0% for T2D on metformin.</div>
             </div>
             <div class="metric-card mc-purple">
               <div class="metric-accent-line"></div>
-              <div class="metric-label">CV</div>
+              <div class="metric-label">CV <button class="term-q" onclick="showTerm(event,'CV')">?</button></div>
               <div class="metric-value" id="v1-r-cv">—</div>
               <div class="metric-unit">%</div>
               <div id="v1-r-cv-badge" class="cv-badge" style="display:none"></div>
-              <div class="metric-help">Coefficient of Variation (SD÷mean). &lt;36% = stable glycemic control. Metformin reduces CV by lowering fasting excursions.</div>
+              <div class="metric-help">Coefficient of Variation (SD÷mean). &lt;36% = stable control.</div>
             </div>
             <div class="metric-card mc-amber">
               <div class="metric-accent-line"></div>
-              <div class="metric-label">Std Deviation</div>
+              <div class="metric-label">Std Deviation <button class="term-q" onclick="showTerm(event,'SD')">?</button></div>
               <div class="metric-value" id="v1-r-sd">—</div>
               <div class="metric-unit">mg/dL</div>
-              <div class="metric-help">Standard deviation across all readings. Lower SD indicates more consistent glucose control achieved with treatment.</div>
+              <div class="metric-help">Spread of glucose values. Lower = more consistent control.</div>
             </div>
             <div class="metric-card mc-red">
               <div class="metric-accent-line"></div>
-              <div class="metric-label">MAGE</div>
+              <div class="metric-label">MAGE <button class="term-q" onclick="showTerm(event,'MAGE')">?</button></div>
               <div class="metric-value" id="v1-r-mage">—</div>
               <div class="metric-unit">mg/dL</div>
-              <div class="metric-help">Mean Amplitude of Glycemic Excursions. Measures instability beyond 1 SD. Target &lt;140 mg/dL in treated T2D.</div>
+              <div class="metric-help">Mean Amplitude of Glycemic Excursions. Target &lt;140 mg/dL in treated T2D.</div>
             </div>
             <div class="metric-card mc-green">
               <div class="metric-accent-line"></div>
-              <div class="metric-label">Fasting Glucose</div>
+              <div class="metric-label">Fasting Glucose <button class="term-q" onclick="showTerm(event,'FASTING')">?</button></div>
               <div class="metric-value" id="v1-r-fasting">—</div>
               <div class="metric-unit">mg/dL avg</div>
-              <div class="metric-help">Average 6–10 AM readings (fasting proxy). Metformin primarily reduces hepatic glucose output — expect fasting improvement first.</div>
+              <div class="metric-help">Average 6–10 AM readings (fasting proxy). Key metformin efficacy marker.</div>
             </div>
             <div class="metric-card" style="border-color:var(--border)">
               <div class="metric-accent-line" style="background:#0891b2"></div>
-              <div class="metric-label">Nocturnal Avg</div>
+              <div class="metric-label">Nocturnal Avg <button class="term-q" onclick="showTerm(event,'NOCTURNAL')">?</button></div>
               <div class="metric-value" id="v1-r-nocturnal" style="color:#0891b2">—</div>
               <div class="metric-unit">mg/dL (0–4 AM)</div>
-              <div class="metric-help">Overnight glucose mean. Persistently elevated nocturnal values may indicate hepatic insulin resistance despite daytime control.</div>
+              <div class="metric-help">Overnight glucose mean. Elevated values indicate hepatic insulin resistance.</div>
             </div>
           </div>
 
@@ -2026,8 +2177,13 @@ tr:hover td { background: var(--surface2); }
           <div class="chart-card">
             <div class="chart-header">
               <div>
-                <div class="chart-title">Ambulatory Glucose Profile (AGP)</div>
+                <div class="chart-title">Ambulatory Glucose Profile (AGP) <button class="term-q" onclick="showTerm(event,'AGP')">?</button></div>
                 <div class="chart-subtitle">Median glucose and interquartile range (25th–75th pct) by hour of day — reveals daily pattern and postprandial excursions</div>
+              </div>
+              <div class="zoom-btn-group">
+                <button class="zoom-btn" onclick="zoomChart('v1','agp',1.3)" title="Zoom in">+</button>
+                <button class="zoom-btn" onclick="zoomChart('v1','agp',0.7)" title="Zoom out">−</button>
+                <button class="btn btn-sm" onclick="STATE['v1'].charts.agp?.resetZoom()" style="padding:4px 8px;font-size:11px">Reset</button>
               </div>
             </div>
             <canvas id="v1-agp-chart" height="90"></canvas>
@@ -2053,6 +2209,32 @@ tr:hover td { background: var(--surface2); }
                 </div>
               </div>
               <canvas id="v1-tir-trend-chart" height="200"></canvas>
+            </div>
+          </div>
+
+          <!-- Postprandial & Dose-Response (shown only when metformin data available) -->
+          <div id="v1-advanced-charts" style="display:none">
+            <div class="research-section-title">Advanced Analysis <span class="section-badge">ACTIVE SUBJECT</span></div>
+            <div class="charts-row">
+              <div class="chart-card">
+                <div class="chart-header">
+                  <div>
+                    <div class="chart-title">Postprandial Excursion Analysis</div>
+                    <div class="chart-subtitle">Meal-window glucose pre vs post metformin — breakfast (6–9 AM), lunch (11 AM–2 PM), dinner (5–8 PM)</div>
+                  </div>
+                </div>
+                <canvas id="v1-postprandial-chart" height="200"></canvas>
+              </div>
+              <div class="chart-card" id="v1-dose-resp-card">
+                <div class="chart-header">
+                  <div>
+                    <div class="chart-title">Dose–Response Scatter</div>
+                    <div class="chart-subtitle">Metformin dose (mg) vs ΔTIR — requires ≥2 subjects with dose + pre/post data</div>
+                  </div>
+                </div>
+                <canvas id="v1-dose-response-chart" height="200"></canvas>
+                <div id="v1-dose-resp-empty" style="display:none;text-align:center;color:var(--muted);font-size:12px;padding:20px 0">Need ≥2 subjects with dose &amp; pre/post data</div>
+              </div>
             </div>
           </div>
 
@@ -2164,8 +2346,19 @@ tr:hover td { background: var(--surface2); }
           <label>Metformin Start Date</label>
           <input type="date" id="v1-modal-met-start" oninput="updateModalPreview('v1')">
           <div class="form-hint">Data before this date = Pre-Metformin &nbsp;·&nbsp; Data from this date onwards = On Metformin</div>
-          <div class="met-period-preview" id="v1-modal-met-preview"></div>
         </div>
+        <div class="form-2col">
+          <div class="form-row">
+            <label>Washout Start</label>
+            <input type="date" id="v1-modal-washout-start" oninput="updateModalPreview('v1')">
+          </div>
+          <div class="form-row">
+            <label>Washout End</label>
+            <input type="date" id="v1-modal-washout-end" oninput="updateModalPreview('v1')">
+            <div class="form-hint">Period excluded from both pre &amp; post analysis</div>
+          </div>
+        </div>
+        <div class="met-period-preview" id="v1-modal-met-preview"></div>
         <div class="form-2col">
           <div class="form-row">
             <label>Starting Dose</label>
@@ -2949,9 +3142,10 @@ function updateResearchMetrics(vid) {
   if (baSection) {
     if (met?.enabled && met?.startDate) {
       baSection.style.display = 'block';
-      const startDt  = new Date(met.startDate + 'T00:00:00');
-      const preData  = activeUser.data.filter(d => d.datetime < startDt);
-      const onData   = activeUser.data.filter(d => d.datetime >= startDt);
+      // Use washout-aware period helper when available, else fall back
+      const _periods = (typeof getMetforminPeriods === 'function') ? getMetforminPeriods(activeUser) : null;
+      const preData  = _periods ? _periods.preData : activeUser.data.filter(d => d.datetime < new Date(met.startDate + 'T00:00:00'));
+      const onData   = _periods ? _periods.onData  : activeUser.data.filter(d => d.datetime >= new Date(met.startDate + 'T00:00:00'));
       const preF     = preData.filter(d => d.value >= 20 && d.value <= 700);
       const onF      = onData.filter(d => d.value >= 20 && d.value <= 700);
       const preDays  = new Set(preF.map(d => toDate(d.datetime))).size;
@@ -3041,6 +3235,7 @@ function updateResearchMetrics(vid) {
     buildTIRTrendChart(vid, data);
   }
   updateResearchTable(vid);
+  if (typeof _updateResearchExtended === 'function') _updateResearchExtended(vid);
 }
 
 function buildAGPChart(vid, data) {
@@ -3262,9 +3457,9 @@ function updateResearchTable(vid) {
     if (anyMet) {
       const met = u.metformin;
       if (met?.enabled && met?.startDate) {
-        const startDt = new Date(met.startDate + 'T00:00:00');
-        const prePts  = u.data.filter(d => d.datetime < startDt);
-        const onPts   = u.data.filter(d => d.datetime >= startDt);
+        const _p = (typeof getMetforminPeriods === 'function') ? getMetforminPeriods(u) : null;
+        const prePts  = _p ? _p.preData : u.data.filter(d => d.datetime < new Date(met.startDate + 'T00:00:00'));
+        const onPts   = _p ? _p.onData  : u.data.filter(d => d.datetime >= new Date(met.startDate + 'T00:00:00'));
         const preAvg  = prePts.length ? (prePts.reduce((a,b) => a + b.value,0)/prePts.length).toFixed(1) : '—';
         const onAvg   = onPts.length  ? (onPts.reduce((a,b)  => a + b.value,0)/onPts.length).toFixed(1)  : '—';
         const preTir  = prePts.length ? (prePts.filter(d => d.value >= 70 && d.value <= 180).length/prePts.length*100).toFixed(1) : '—';
@@ -3281,6 +3476,7 @@ function updateResearchTable(vid) {
       <td><span style="display:inline-flex;align-items:center;gap:6px">
         <span style="width:8px;height:8px;border-radius:50%;background:${u.color};display:inline-block;flex-shrink:0"></span>${u.name}
         ${u.metformin?.enabled ? '<span class="subject-met-badge met-badge-on" style="margin-left:2px">MET</span>' : ''}
+      ${u.metformin?.responderClass && u.metformin.responderClass !== 'pending' ? `<span class="responder-badge ${['responder','partial','non'].includes(u.metformin.responderClass) ? 'r-'+u.metformin.responderClass : 'r-pending'}" style="margin-left:2px">${u.metformin.responderClass === 'responder' ? 'R' : u.metformin.responderClass === 'partial' ? 'PR' : 'NR'}</span>` : ''}
       </span></td>
       <td>${s.n.toLocaleString()}</td>
       <td>${s.avg.toFixed(1)}</td>
@@ -3332,9 +3528,10 @@ function exportResearchCSV(vid) {
     const met = u.metformin;
     if (!met?.enabled || !met?.startDate) return [...base, ...Array(metHdrs.length).fill('')].join(',');
 
+    const _p  = (typeof getMetforminPeriods === 'function') ? getMetforminPeriods(u) : null;
     const startDt = new Date(met.startDate + 'T00:00:00');
-    const pre = u.data.filter(d => d.datetime < startDt);
-    const on  = u.data.filter(d => d.datetime >= startDt);
+    const pre = _p ? _p.preData : u.data.filter(d => d.datetime < startDt);
+    const on  = _p ? _p.onData  : u.data.filter(d => d.datetime >= startDt);
     const statOf = (pts) => {
       if (!pts.length) return ['', '', '', ''];
       const vs = pts.map(d => d.value);
@@ -3378,14 +3575,18 @@ function openSubjectModal(vid, userId) {
     `${toDate(minD)} → ${toDate(maxD)} &nbsp;·&nbsp; ${days} days`;
 
   $('v1-modal-met-enabled').checked   = met.enabled;
-  $('v1-modal-met-start').value       = met.startDate || '';
-  $('v1-modal-met-dose-start').value  = met.doseStart || '';
-  $('v1-modal-met-dose-now').value    = met.doseNow   || '';
-  $('v1-modal-hba1c-pre').value       = met.hba1cPre  || '';
-  $('v1-modal-hba1c-post').value      = met.hba1cPost || '';
-  $('v1-modal-bmi').value             = met.bmi       || '';
-  $('v1-modal-egfr').value            = met.egfr      || '';
-  $('v1-modal-met-notes').value       = met.notes     || '';
+  $('v1-modal-met-start').value       = met.startDate    || '';
+  $('v1-modal-met-dose-start').value  = met.doseStart    || '';
+  $('v1-modal-met-dose-now').value    = met.doseNow      || '';
+  $('v1-modal-hba1c-pre').value       = met.hba1cPre     || '';
+  $('v1-modal-hba1c-post').value      = met.hba1cPost    || '';
+  $('v1-modal-bmi').value             = met.bmi          || '';
+  $('v1-modal-egfr').value            = met.egfr         || '';
+  $('v1-modal-met-notes').value       = met.notes        || '';
+  const _wsEl = $('v1-modal-washout-start');
+  const _weEl = $('v1-modal-washout-end');
+  if (_wsEl) _wsEl.value = met.washoutStart || '';
+  if (_weEl) _weEl.value = met.washoutEnd   || '';
 
   updateModalPreview(vid);
   $('v1-subject-modal-backdrop').classList.add('open');
@@ -3412,24 +3613,36 @@ function updateModalPreview(vid) {
   const onDays  = new Set(user.data.filter(d => d.datetime >= startDt).map(d => toDate(d.datetime))).size;
 
   if (preCnt === 0 && onCnt === 0) { preview.innerHTML = '<span style="color:var(--red)">Date outside data range</span>'; return; }
-  preview.innerHTML =
+  let previewHtml =
     `<span class="pre-span">Pre-metformin: ${preCnt} readings · ${preDays} days</span> &nbsp;/&nbsp; ` +
     `<span class="on-span">On metformin: ${onCnt} readings · ${onDays} days</span>`;
+  // Washout summary
+  const wsVal = $('v1-modal-washout-start')?.value;
+  const weVal = $('v1-modal-washout-end')?.value;
+  if (wsVal && weVal && wsVal < weVal) {
+    const wsD  = new Date(wsVal + 'T00:00:00');
+    const weD  = new Date(weVal + 'T23:59:59');
+    const woCnt = user.data.filter(d => d.datetime >= wsD && d.datetime <= weD).length;
+    previewHtml += ` &nbsp;<span class="washout-badge">⛔ Washout: ${woCnt} pts excluded</span>`;
+  }
+  preview.innerHTML = previewHtml;
 }
 
 function saveSubjectModal(vid) {
   const user = STATE[vid]?.users.find(u => u.id === _modalUserId);
   if (!user) return;
   user.metformin = {
-    enabled:   $('v1-modal-met-enabled').checked,
-    startDate: $('v1-modal-met-start').value || null,
-    doseStart: $('v1-modal-met-dose-start').value.trim(),
-    doseNow:   $('v1-modal-met-dose-now').value.trim(),
-    hba1cPre:  $('v1-modal-hba1c-pre').value.trim(),
-    hba1cPost: $('v1-modal-hba1c-post').value.trim(),
-    bmi:       $('v1-modal-bmi').value.trim(),
-    egfr:      $('v1-modal-egfr').value.trim(),
-    notes:     $('v1-modal-met-notes').value.trim(),
+    enabled:      $('v1-modal-met-enabled').checked,
+    startDate:    $('v1-modal-met-start').value || null,
+    doseStart:    $('v1-modal-met-dose-start').value.trim(),
+    doseNow:      $('v1-modal-met-dose-now').value.trim(),
+    hba1cPre:     $('v1-modal-hba1c-pre').value.trim(),
+    hba1cPost:    $('v1-modal-hba1c-post').value.trim(),
+    bmi:          $('v1-modal-bmi').value.trim(),
+    egfr:         $('v1-modal-egfr').value.trim(),
+    notes:        $('v1-modal-met-notes').value.trim(),
+    washoutStart: $('v1-modal-washout-start')?.value || null,
+    washoutEnd:   $('v1-modal-washout-end')?.value   || null,
   };
   closeSubjectModal(vid);
   renderSubjects(vid);
@@ -4014,6 +4227,485 @@ function applyTweaks() {
 
 // ─── BUILD COMPARE on tab click ───────────────
 function buildCompareChart() { buildCompareOverlay('v1'); buildCompareOverlay('v2'); }
+
+// ═══════════════════════════════════════════════
+// ZOOM CONTROLS
+// ═══════════════════════════════════════════════
+function zoomChart(vid, key, factor) {
+  const chart = STATE[vid].charts[key];
+  if (!chart) return;
+  if (chart.zoom) {
+    chart.zoom(factor);
+  } else {
+    // Fallback: manually scale y-axis
+    const yScale = chart.options.scales?.y;
+    if (!yScale) return;
+    const cur = chart.scales.y;
+    const mid = (cur.min + cur.max) / 2;
+    const half = (cur.max - cur.min) / 2 / factor;
+    yScale.min = mid - half;
+    yScale.max = mid + half;
+    chart.update('none');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// GLOSSARY SYSTEM
+// ═══════════════════════════════════════════════
+const GLOSSARY = {
+  GMI: {
+    term: 'GMI — Glucose Management Indicator',
+    def: 'An estimate of HbA1c derived from continuous glucose monitor data. Published by the American Diabetes Association as a standardized way to compare CGM data to lab HbA1c. A GMI ≥7.0% indicates suboptimal glycemic control in Type 2 Diabetes.',
+    formula: 'GMI (%) = 3.31 + 0.02392 × mean glucose (mg/dL)',
+    target: 'Target: <7.0% for T2D on metformin'
+  },
+  CV: {
+    term: 'CV — Coefficient of Variation',
+    def: 'The ratio of glucose standard deviation to mean glucose, expressed as a percentage. The ADA/EASD 2019 consensus defines a CV <36% as "stable glycemia". High CV indicates unpredictable glucose swings regardless of average level.',
+    formula: 'CV (%) = (SD ÷ Mean) × 100',
+    target: 'Target: <36% for stable glycemic control'
+  },
+  SD: {
+    term: 'SD — Standard Deviation',
+    def: 'Measures the spread of glucose values around the mean. A lower SD indicates more consistent glucose levels. Unlike CV, SD is not normalized to mean, so it is more meaningful when comparing subjects with similar average glucose.',
+    formula: 'SD = √[Σ(xᵢ − x̄)² / n]',
+    target: 'Target: <50 mg/dL in treated T2D'
+  },
+  MAGE: {
+    term: 'MAGE — Mean Amplitude of Glycemic Excursions',
+    def: 'The average magnitude of glucose excursions that exceed one standard deviation from the mean. MAGE captures glycemic variability beyond what SD alone conveys, focusing on clinically significant glucose swings. Higher MAGE correlates with oxidative stress and cardiovascular risk.',
+    formula: 'MAGE = mean of excursion peaks/nadirs > 1 SD from mean',
+    target: 'Target: <140 mg/dL in treated T2D'
+  },
+  AGP: {
+    term: 'AGP — Ambulatory Glucose Profile',
+    def: 'A standardized 24-hour glucose visualization that overlays all available CGM days. The solid line shows the median glucose for each hour; the shaded band shows the interquartile range (25th–75th percentile). Developed by the International Diabetes Center and endorsed by the ADA as a standard CGM report.',
+    formula: 'Median + IQR (P25, P75) by hour of day across all days',
+    target: 'Target band: 70–180 mg/dL (green dashed lines)'
+  },
+  TIR: {
+    term: 'TIR — Time in Range',
+    def: 'The percentage of CGM readings between 70 and 180 mg/dL. The primary CGM outcome metric in clinical trials. ADA 2023 recommends >70% TIR as the goal for most adults with T2D. Each 5% improvement in TIR correlates with meaningful reductions in HbA1c.',
+    formula: 'TIR (%) = readings in 70–180 mg/dL ÷ total readings × 100',
+    target: 'Target: >70% for T2D · >50% minimum threshold'
+  },
+  TBR: {
+    term: 'TBR — Time Below Range',
+    def: 'The percentage of readings below 70 mg/dL (hypoglycemia). The ADA classifies two levels: Level 1 (54–69 mg/dL) and Level 2 (<54 mg/dL, clinically significant). Metformin alone rarely causes hypoglycemia but TBR should be monitored especially with combination therapy.',
+    formula: 'TBR L1: 54–69 mg/dL · TBR L2: <54 mg/dL',
+    target: 'Target: TBR L1 <4% · TBR L2 <1%'
+  },
+  TAR: {
+    term: 'TAR — Time Above Range',
+    def: 'The percentage of readings above 180 mg/dL (hyperglycemia). Level 1 (181–250 mg/dL) represents moderate hyperglycemia; Level 2 (>250 mg/dL) is a clinically urgent value. Elevated TAR drives the cumulative glycemic burden linked to microvascular complications.',
+    formula: 'TAR L1: 181–250 mg/dL · TAR L2: >250 mg/dL',
+    target: 'Target: TAR L1 <25% · TAR L2 <5%'
+  },
+  FASTING: {
+    term: 'Fasting Glucose (6–10 AM Proxy)',
+    def: 'Average glucose readings during the 6–10 AM window, used as a surrogate for fasting plasma glucose in ambulatory CGM data. Metformin primarily reduces hepatic glucose production overnight and in the fasting state, so this metric is one of the most sensitive indicators of metformin efficacy.',
+    formula: 'Mean CGM reading between 06:00 and 09:59',
+    target: 'ADA target fasting PG: 80–130 mg/dL'
+  },
+  NOCTURNAL: {
+    term: 'Nocturnal Glucose Average (0–4 AM)',
+    def: 'Mean CGM readings during 0–4 AM, reflecting overnight glycemia. Elevated nocturnal glucose suggests uncontrolled hepatic glucose output (a key mechanism in T2D) and is a marker of insulin resistance. Metformin\'s suppression of hepatic gluconeogenesis should lower nocturnal levels.',
+    formula: 'Mean CGM reading between 00:00 and 03:59',
+    target: 'Target: 70–130 mg/dL overnight'
+  },
+  COHENS_D: {
+    term: "Cohen's d — Effect Size",
+    def: "A standardized measure of the magnitude of difference between two groups (pre vs on metformin). Unlike p-values, effect size tells you how meaningful the difference is clinically: small (<0.5), medium (0.5–0.8), or large (≥0.8). A large effect size with limited data still warrants caution.",
+    formula: "d = (pre_mean − post_mean) ÷ pooled SD\npooled SD = √((SD_pre² + SD_post²) / 2)",
+    target: 'Small: d<0.5 · Medium: 0.5–0.8 · Large: ≥0.8'
+  },
+  RESPONDER: {
+    term: 'Responder Classification',
+    def: 'A threshold-based classification of metformin treatment response using CGM metrics. Based on clinically meaningful change thresholds used in CGM intervention studies. Requires sufficient pre and post data for reliable classification.',
+    formula: 'Responder: ΔTIR ≥10pp OR ΔGMI ≤−0.5%\nPartial: ΔTIR ≥5pp OR ΔGMI ≤−0.3%\nNon-responder: below all thresholds',
+    target: 'Need ≥14 days pre and ≥14 days post for stable estimates'
+  },
+  WASHOUT: {
+    term: 'Washout Period',
+    def: 'A defined window between the end of pre-treatment monitoring and confirmed stable metformin blood levels. During titration (typically weeks 1–4), metformin has not yet reached steady state and readings are neither clearly "pre" nor "on" treatment. Excluding this period prevents contaminating either analysis window.',
+    formula: 'Readings in washout window excluded from both pre & post analysis',
+    target: 'Typical washout: 1–4 weeks post-initiation during titration'
+  }
+};
+
+function showTerm(event, termKey) {
+  event.stopPropagation();
+  const entry = GLOSSARY[termKey];
+  if (!entry) return;
+  const popup = document.getElementById('glossary-popup');
+  document.getElementById('gp-term-title').textContent = entry.term;
+  document.getElementById('gp-term-def').textContent = entry.def;
+  const formulaEl = document.getElementById('gp-term-formula');
+  if (entry.formula) { formulaEl.textContent = entry.formula; formulaEl.style.display = 'block'; }
+  else { formulaEl.style.display = 'none'; }
+  const targetEl = document.getElementById('gp-term-target');
+  if (entry.target) { targetEl.textContent = entry.target; targetEl.style.display = 'block'; }
+  else { targetEl.style.display = 'none'; }
+
+  // Position near clicked button
+  const rect = event.target.getBoundingClientRect();
+  popup.style.left = Math.min(rect.left, window.innerWidth - 320) + 'px';
+  popup.style.top  = (rect.bottom + 8) + 'px';
+  popup.classList.add('open');
+
+  // Close on outside click
+  setTimeout(() => document.addEventListener('click', hideTerm, { once: true }), 0);
+}
+
+function hideTerm() {
+  document.getElementById('glossary-popup').classList.remove('open');
+}
+
+function showGlossaryPanel() {
+  const panel = document.getElementById('glossary-panel');
+  const body  = document.getElementById('glossary-panel-body');
+  body.innerHTML = Object.values(GLOSSARY).map(e => `
+    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:5px">${e.term}</div>
+      <div style="font-size:12px;line-height:1.6;color:var(--text2)">${e.def}</div>
+      ${e.formula ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px;padding:5px 8px;background:var(--surface2);border-radius:4px;white-space:pre-line">${e.formula}</div>` : ''}
+      ${e.target ? `<div style="font-size:10px;font-weight:600;color:var(--green);margin-top:5px">${e.target}</div>` : ''}
+    </div>`).join('');
+  panel.style.display = 'block';
+}
+
+// (washout modal fields are now wired directly into the base functions below)
+
+// ═══════════════════════════════════════════════
+// HELPER: get pre/post data respecting washout
+// ═══════════════════════════════════════════════
+function getMetforminPeriods(user) {
+  const met = user.metformin;
+  if (!met?.enabled || !met?.startDate) return null;
+  const startDt = new Date(met.startDate + 'T00:00:00');
+  let preData = user.data.filter(d => d.datetime < startDt);
+  let onData  = user.data.filter(d => d.datetime >= startDt);
+  // Exclude washout window from BOTH periods
+  if (met.washoutStart && met.washoutEnd) {
+    const wsD = new Date(met.washoutStart + 'T00:00:00');
+    const weD = new Date(met.washoutEnd   + 'T23:59:59');
+    preData = preData.filter(d => !(d.datetime >= wsD && d.datetime <= weD));
+    onData  = onData.filter( d => !(d.datetime >= wsD && d.datetime <= weD));
+  }
+  return { preData, onData, startDt };
+}
+
+// ═══════════════════════════════════════════════
+// RESPONDER CLASSIFICATION + COHEN'S D
+// ═══════════════════════════════════════════════
+function classifyResponder(pre, on) {
+  if (!pre || !on) return 'pending';
+  const deltaTIR = on.tir - pre.tir;
+  const deltaGMI = on.gmi - pre.gmi;
+  if (deltaTIR >= 10 || deltaGMI <= -0.5) return 'responder';
+  if (deltaTIR >= 5  || deltaGMI <= -0.3) return 'partial';
+  return 'non';
+}
+
+function calcCohensD(pre, on) {
+  if (!pre || !on || !pre.sd || !on.sd) return null;
+  const pooledSD = Math.sqrt((pre.sd ** 2 + on.sd ** 2) / 2);
+  if (!pooledSD) return null;
+  return (pre.avg - on.avg) / pooledSD;
+}
+
+function responderLabel(cls) {
+  const map = {
+    responder: ['r-responder', '✓ Responder'],
+    partial:   ['r-partial',   '~ Partial Responder'],
+    non:       ['r-non',       '✕ Non-responder'],
+    pending:   ['r-pending',   '· Insufficient Data']
+  };
+  return map[cls] || map.pending;
+}
+
+// ═══════════════════════════════════════════════
+// DOSE-RESPONSE SCATTER
+// ═══════════════════════════════════════════════
+function buildDoseResponseChart(vid) {
+  destroyChart(vid, 'dose-response');
+  const st     = STATE[vid];
+  const { tickColor, gridColor, monoFont } = chartDefaults(vid);
+  const card   = $('v1-dose-resp-card');
+  const emptyEl = $('v1-dose-resp-empty');
+  const canvas  = $('v1-dose-response-chart');
+  if (!canvas) return;
+
+  const points = [];
+  st.users.forEach(u => {
+    const met = u.metformin;
+    if (!met?.enabled || !met?.startDate) return;
+    const doseStr = met.doseNow || met.doseStart;
+    if (!doseStr) return;
+    const doseNum = parseFloat(doseStr.replace(/[^\d.]/g, ''));
+    if (!doseNum) return;
+    const periods = getMetforminPeriods(u);
+    if (!periods) return;
+    const { preData, onData } = periods;
+    const preStats = calcLocalStats(preData);
+    const onStats  = calcLocalStats(onData);
+    if (!preStats || !onStats) return;
+    points.push({ x: doseNum, y: onStats.tir - preStats.tir, label: u.name, color: u.color });
+  });
+
+  if (points.length < 2) {
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  canvas.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const ctx = canvas.getContext('2d');
+  STATE[vid].charts['dose-response'] = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: points.map(p => ({
+        label: p.label,
+        data: [{ x: p.x, y: p.y }],
+        backgroundColor: p.color + 'cc',
+        borderColor: p.color,
+        pointRadius: 8,
+        pointHoverRadius: 10
+      }))
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true, labels: { color: tickColor, font: { family: monoFont, size: 10 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.x} mg → ΔTIR ${c.parsed.y > 0 ? '+' : ''}${c.parsed.y.toFixed(1)}pp` } }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Dose (mg)', color: tickColor, font: { family: monoFont, size: 10 } }, ticks: { color: tickColor, font: { family: monoFont, size: 9 } }, grid: { color: gridColor } },
+        y: { title: { display: true, text: 'ΔTIR (pp)', color: tickColor, font: { family: monoFont, size: 10 } }, ticks: { color: tickColor, font: { family: monoFont, size: 9 }, callback: v => (v > 0 ? '+' : '') + v + 'pp' }, grid: { color: gridColor } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════
+// POSTPRANDIAL EXCURSION CHART
+// ═══════════════════════════════════════════════
+function calcLocalStats(data) {
+  if (!data.length) return null;
+  const vs  = data.map(d => d.value);
+  const avg = vs.reduce((a,b) => a+b,0) / vs.length;
+  const sd  = Math.sqrt(vs.map(v => (v-avg)**2).reduce((a,b)=>a+b,0)/vs.length);
+  return {
+    avg, sd,
+    tir: (vs.filter(v => v>=70&&v<=180).length/vs.length*100),
+    gmi: (3.31 + 0.02392 * avg)
+  };
+}
+
+function buildPostprandialChart(vid, user, preData, onData) {
+  destroyChart(vid, 'postprandial');
+  const canvas = $('v1-postprandial-chart');
+  if (!canvas) return;
+  const { tickColor, gridColor, monoFont } = chartDefaults(vid);
+
+  const windows = [
+    { label: 'Breakfast\n(6–9 AM)',   hours: [6,7,8]  },
+    { label: 'Lunch\n(11AM–2PM)',     hours: [11,12,13] },
+    { label: 'Dinner\n(5–8 PM)',      hours: [17,18,19] },
+  ];
+
+  const preAvgs = windows.map(w => {
+    const pts = preData.filter(d => w.hours.includes(d.datetime.getHours()));
+    return pts.length ? pts.reduce((a,b) => a+b.value,0)/pts.length : null;
+  });
+  const onAvgs = windows.map(w => {
+    const pts = onData.filter(d => w.hours.includes(d.datetime.getHours()));
+    return pts.length ? pts.reduce((a,b) => a+b.value,0)/pts.length : null;
+  });
+
+  const ctx = canvas.getContext('2d');
+  STATE[vid].charts['postprandial'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: windows.map(w => w.label),
+      datasets: [
+        { label: 'Pre-Metformin', data: preAvgs, backgroundColor: 'rgba(180,83,9,0.65)', borderColor: '#b45309', borderWidth: 1.5, borderRadius: 4 },
+        { label: 'On Metformin',  data: onAvgs,  backgroundColor: 'rgba(5,150,105,0.65)', borderColor: '#059669', borderWidth: 1.5, borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true, labels: { color: tickColor, font: { family: monoFont, size: 10 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: c => c.parsed.y !== null ? `${c.dataset.label}: ${c.parsed.y.toFixed(1)} mg/dL` : 'No data' } }
+      },
+      scales: {
+        x: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, maxRotation: 0 }, grid: { display: false } },
+        y: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, callback: v => v + ' mg/dL' }, grid: { color: gridColor }, suggestedMin: 60, suggestedMax: 220 }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════
+// EXTENDED RESEARCH METRICS (suggestions 2,4,5,6)
+// Called at end of updateResearchMetrics via direct edit below
+// ═══════════════════════════════════════════════
+function _updateResearchExtended(vid) {
+  if (vid !== 'v1') return;
+
+  const st          = STATE[vid];
+  const activeUser  = st.users.find(u => u.id === st.activeId);
+  const periods     = activeUser ? getMetforminPeriods(activeUser) : null;
+
+  // Advanced charts section visibility
+  const advEl = $('v1-advanced-charts');
+  if (advEl) advEl.style.display = periods ? 'block' : 'none';
+
+  if (periods && $('v1-view-research')?.classList.contains('active')) {
+    const { preData, onData } = periods;
+    const preStats = calcLocalStats(preData);
+    const onStats  = calcLocalStats(onData);
+
+    // Responder badge
+    const rBadge = $('v1-ba-responder-badge');
+    if (rBadge) {
+      const cls = classifyResponder(preStats, onStats);
+      activeUser.metformin.responderClass = cls;
+      const [rClass, rText] = responderLabel(cls);
+      rBadge.innerHTML = `<span class="responder-badge ${rClass}">${rText}</span>`;
+      rBadge.style.display = 'inline';
+    }
+
+    // Cohen's d effect size
+    const eBadge = $('v1-ba-effect-badge');
+    const dWarn  = $('v1-ba-days-warn');
+    if (eBadge) {
+      const d = calcCohensD(preStats, onStats);
+      if (d !== null) {
+        const absD = Math.abs(d);
+        const size = absD >= 0.8 ? 'Large' : absD >= 0.5 ? 'Medium' : 'Small';
+        eBadge.innerHTML = `<span class="effect-badge" title="Cohen's d effect size — how large is the treatment effect?">d=${d.toFixed(2)} (${size})</span>`;
+        eBadge.style.display = 'inline';
+      } else {
+        eBadge.style.display = 'none';
+      }
+    }
+    if (dWarn) {
+      const preDays = new Set(preData.map(d => toDate(d.datetime))).size;
+      const onDays  = new Set(onData.map( d => toDate(d.datetime))).size;
+      if (preDays < 14 || onDays < 14) {
+        dWarn.innerHTML = `<span class="min-days-warn">⚠ Need ≥14 days pre &amp; post for stable metrics (${preDays}/${onDays} days)</span>`;
+        dWarn.style.display = 'inline';
+      } else {
+        dWarn.style.display = 'none';
+      }
+    }
+
+    // Postprandial chart
+    if ($('v1-view-research')?.classList.contains('active')) {
+      buildPostprandialChart(vid, activeUser, preData, onData);
+      buildDoseResponseChart(vid);
+    }
+  } else {
+    // Hide badges when no metformin
+    ['v1-ba-responder-badge','v1-ba-effect-badge','v1-ba-days-warn'].forEach(id => {
+      const el = $(id); if (el) el.style.display = 'none';
+    });
+  }
+
+  // Cohort summary row
+  _addCohortSummaryRow(vid);
+}
+
+// ═══════════════════════════════════════════════
+// COHORT SUMMARY ROW
+// ═══════════════════════════════════════════════
+function _addCohortSummaryRow(vid) {
+  if (vid !== 'v1') return;
+  const tbody = $('v1-research-table-body');
+  if (!tbody) return;
+  // Remove old cohort row
+  tbody.querySelectorAll('.cohort-row').forEach(r => r.remove());
+
+  const st = STATE[vid];
+  if (st.users.length < 2) return;
+
+  const statsList = st.users.map(u => calcSubjectStats(u)).filter(Boolean);
+  if (!statsList.length) return;
+
+  const mean = (arr, key) => arr.reduce((a,b) => a + (b[key] || 0), 0) / arr.length;
+
+  const avgAvg  = mean(statsList, 'avg');
+  const avgGMI  = mean(statsList, 'gmi');
+  const avgCV   = mean(statsList, 'cv');
+  const avgSD   = mean(statsList, 'sd');
+  const avgTIR  = mean(statsList, 'tir');
+  const avgTBR  = mean(statsList, 'tbr');
+  const avgTAR  = mean(statsList, 'tar');
+  const fastList = statsList.filter(s => s.fastAvg !== null);
+  const avgFast  = fastList.length ? fastList.reduce((a,b) => a + b.fastAvg, 0) / fastList.length : null;
+  const totalDays = statsList.reduce((a,b) => a + b.days, 0);
+
+  const anyMet = st.users.some(u => u.metformin?.enabled && u.metformin?.startDate);
+
+  let metCohortCols = '';
+  if (anyMet) {
+    const metUsers = st.users.filter(u => u.metformin?.enabled && u.metformin?.startDate);
+    if (metUsers.length) {
+      const preAvgs = metUsers.map(u => {
+        const p = getMetforminPeriods(u);
+        if (!p) return null;
+        const s = calcLocalStats(p.preData);
+        return s?.avg ?? null;
+      }).filter(v => v !== null);
+      const onAvgs = metUsers.map(u => {
+        const p = getMetforminPeriods(u);
+        if (!p) return null;
+        const s = calcLocalStats(p.onData);
+        return s?.avg ?? null;
+      }).filter(v => v !== null);
+      const preTirs = metUsers.map(u => {
+        const p = getMetforminPeriods(u);
+        if (!p) return null;
+        const s = calcLocalStats(p.preData);
+        return s?.tir ?? null;
+      }).filter(v => v !== null);
+      const onTirs = metUsers.map(u => {
+        const p = getMetforminPeriods(u);
+        if (!p) return null;
+        const s = calcLocalStats(p.onData);
+        return s?.tir ?? null;
+      }).filter(v => v !== null);
+      const mPreAvg = preAvgs.length ? (preAvgs.reduce((a,b)=>a+b,0)/preAvgs.length).toFixed(1) : '—';
+      const mOnAvg  = onAvgs.length  ? (onAvgs.reduce((a,b)=>a+b,0)/onAvgs.length).toFixed(1)   : '—';
+      const mPreTir = preTirs.length ? (preTirs.reduce((a,b)=>a+b,0)/preTirs.length).toFixed(1)+'%' : '—';
+      const mOnTir  = onTirs.length  ? (onTirs.reduce((a,b)=>a+b,0)/onTirs.length).toFixed(1)+'%'  : '—';
+      metCohortCols = `<td>${mPreAvg}</td><td>${mOnAvg}</td><td>${mPreTir}</td><td>${mOnTir}</td>`;
+    } else {
+      metCohortCols = `<td colspan="4">—</td>`;
+    }
+  }
+
+  const cohortRow = document.createElement('tr');
+  cohortRow.className = 'cohort-row';
+  cohortRow.innerHTML = `
+    <td>Cohort Mean (n=${statsList.length})</td>
+    <td>—</td>
+    <td>${avgAvg.toFixed(1)}</td>
+    <td>${avgGMI.toFixed(1)}</td>
+    <td>${avgCV.toFixed(1)}</td>
+    <td>${avgSD.toFixed(1)}</td>
+    <td>${avgTIR.toFixed(1)}</td>
+    <td>${avgTBR.toFixed(1)}</td>
+    <td>${avgTAR.toFixed(1)}</td>
+    <td>${avgFast !== null ? avgFast.toFixed(1) : '—'}</td>
+    <td>${totalDays}</td>
+    ${metCohortCols}
+  `;
+  tbody.appendChild(cohortRow);
+}
 
 </script>
 </body>
