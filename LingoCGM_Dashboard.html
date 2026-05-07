@@ -4637,6 +4637,840 @@ function exportErrorLogCSV() {
   URL.revokeObjectURL(a.href);
 }
 
+// ═══ SMOOTHING ENGINE ══════════════════════════════
+function smoothData(data, method) {
+  if (!data.length || method === 'none') return data;
+  const sorted = [...data].sort((a,b) => a.datetime - b.datetime);
+  if (method === 'med5') {
+    return sorted.map((pt, i) => {
+      const win = sorted.filter(p => Math.abs(p.datetime - pt.datetime) <= 2.5*60000).map(p=>p.value);
+      const s = [...win].sort((a,b)=>a-b); const v = s[Math.floor(s.length/2)];
+      return {...pt, value: v};
+    });
+  }
+  if (method === 'mean15') {
+    return sorted.map((pt, i) => {
+      const win = sorted.filter(p => Math.abs(p.datetime - pt.datetime) <= 7.5*60000).map(p=>p.value);
+      return {...pt, value: win.reduce((a,b)=>a+b,0)/win.length};
+    });
+  }
+  if (method === 'loess') return loess(sorted, 0.1);
+  return sorted;
+}
+
+function loess(pts, span) {
+  const n = pts.length, k = Math.max(2, Math.round(span * n));
+  return pts.map((pt, i) => {
+    const dists = pts.map((p,j) => ({j, d: Math.abs(p.datetime - pt.datetime)})).sort((a,b)=>a.d-b.d).slice(0,k);
+    const maxD = dists[dists.length-1].d || 1;
+    let sw=0, swx=0, swy=0, swx2=0, swxy=0;
+    dists.forEach(({j,d}) => {
+      const u = d/maxD, w = Math.pow(1-u*u*u, 3);
+      const x = pts[j].datetime; const y = pts[j].value;
+      sw+=w; swx+=w*x; swy+=w*y; swx2+=w*x*x; swxy+=w*x*y;
+    });
+    const denom = sw*swx2 - swx*swx;
+    const b = denom ? (sw*swxy - swx*swy)/denom : 0;
+    const a = (swy - b*swx)/sw;
+    return {...pt, value: a + b*pt.datetime};
+  });
+}
+
+function suppressOutliers(data) {
+  const vs = data.map(d=>d.value);
+  const avg = vs.reduce((a,b)=>a+b,0)/vs.length;
+  const sd = Math.sqrt(vs.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vs.length);
+  return data.filter(d => Math.abs(d.value - avg) <= 3*sd);
+}
+
+// ═══ CYCLE ENGINE ══════════════════════════════
+function computeCycles(startDateStr, onDays, offDays, dataRange) {
+  if (!startDateStr) return [];
+  const start = new Date(startDateStr + 'T00:00:00');
+  const periodMs = (onDays + offDays) * 86400000;
+  const cycles = [];
+  let cur = start;
+  let n = 1;
+  const end = new Date(dataRange.max.getTime() + 86400000);
+  while (cur < end) {
+    const onEnd = new Date(cur.getTime() + onDays * 86400000);
+    cycles.push({ n, phase:'on', start: new Date(cur), end: onEnd });
+    const offEnd = new Date(onEnd.getTime() + offDays * 86400000);
+    cycles.push({ n, phase:'off', start: new Date(onEnd), end: offEnd });
+    cur = offEnd;
+    n++;
+  }
+  return cycles.filter(c => c.start <= end && c.end >= dataRange.min);
+}
+
+function getDataPhase(d, cycles) {
+  for (const c of cycles) {
+    if (d.datetime >= c.start && d.datetime < c.end) return c;
+  }
+  return null;
+}
+
+function applyProtocol() {
+  const enabled = $('proto-enabled')?.checked;
+  const startDate = $('proto-start')?.value;
+  const onDays = parseInt($('proto-on')?.value || 7);
+  const offDays = parseInt($('proto-off')?.value || 7);
+  const smoothing = $('proto-smooth')?.value || 'none';
+  const suppressOutl = $('proto-suppress-outliers')?.checked;
+  const skipWarmup = $('proto-skip-warmup')?.checked;
+  const autoWashout = $('proto-auto-washout')?.checked;
+
+  const vid = 'v1';
+  const st = STATE[vid];
+  st.cycleProtocol = { enabled: !!enabled, startDate, onDays, offDays, smoothing, suppressOutl, skipWarmup, autoWashout };
+
+  if (enabled && startDate) {
+    const allPts = st.users.flatMap(u => u.data);
+    if (!allPts.length) return;
+    const dmin = new Date(Math.min(...allPts.map(d=>d.datetime)));
+    const dmax = new Date(Math.max(...allPts.map(d=>d.datetime)));
+    st.cycles = computeCycles(startDate, onDays, offDays, {min:dmin, max:dmax});
+    $('v1-cycle-stats-section').style.display = 'block';
+    $('v1-proto-summary').style.display = 'block';
+    buildCycleAnalysis(vid);
+  } else {
+    st.cycles = [];
+    $('v1-cycle-stats-section').style.display = 'none';
+    $('v1-proto-summary').style.display = 'none';
+  }
+}
+
+// ═══ STATISTICAL ENGINE ════════════════════════
+function tTest(a, b) {
+  if (a.length < 2 || b.length < 2) return {t:NaN, p:NaN, ci:[NaN,NaN]};
+  const na=a.length, nb=b.length;
+  const ma=a.reduce((x,y)=>x+y,0)/na, mb=b.reduce((x,y)=>x+y,0)/nb;
+  const sa=Math.sqrt(a.map(v=>(v-ma)**2).reduce((x,y)=>x+y,0)/(na-1));
+  const sb=Math.sqrt(b.map(v=>(v-mb)**2).reduce((x,y)=>x+y,0)/(nb-1));
+  const se=Math.sqrt(sa*sa/na + sb*sb/nb);
+  if (!se) return {t:0, p:1, ci:[0,0], ma, mb};
+  const t=(ma-mb)/se;
+  const df=Math.pow(sa*sa/na+sb*sb/nb,2)/(Math.pow(sa*sa/na,2)/(na-1)+Math.pow(sb*sb/nb,2)/(nb-1));
+  const p=2*(1-tDist(Math.abs(t),df));
+  const tCrit=1.96;
+  return {t, p, ci:[ma-mb-tCrit*se, ma-mb+tCrit*se], ma, mb, se, df};
+}
+
+function wilcoxon(a, b) {
+  if (a.length < 2) return {W:NaN, p:NaN};
+  const n = Math.min(a.length, b.length);
+  const diffs = Array.from({length:n}, (_,i) => a[i]-b[i]).filter(d=>d!==0);
+  const ranked = diffs.map((d,i)=>({d,abs:Math.abs(d),sign:Math.sign(d)}))
+    .sort((a,b)=>a.abs-b.abs)
+    .map((x,i)=>({...x,rank:i+1}));
+  const Wp = ranked.filter(r=>r.sign>0).reduce((s,r)=>s+r.rank,0);
+  const nd = ranked.length;
+  const W = Math.min(Wp, nd*(nd+1)/2-Wp);
+  const meanW = nd*(nd+1)/4;
+  const sdW = Math.sqrt(nd*(nd+1)*(2*nd+1)/24);
+  const z = Math.abs((W-meanW)/sdW);
+  const p = 2*(1-normalCDF(z));
+  return {W, p};
+}
+
+function isNormal(arr) {
+  if (arr.length < 8) return false;
+  const n=arr.length, m=arr.reduce((a,b)=>a+b,0)/n;
+  const s3=arr.map(v=>Math.pow(v-m,3)).reduce((a,b)=>a+b,0)/n;
+  const s2=Math.pow(arr.map(v=>(v-m)**2).reduce((a,b)=>a+b,0)/n,1.5);
+  const skew=s3/s2;
+  return Math.abs(skew) < 1;
+}
+
+function tDist(t, df) {
+  const x = df/(df+t*t);
+  return 1 - 0.5*ibeta(df/2, 0.5, x);
+}
+
+function ibeta(a, b, x) {
+  if (x<0||x>1) return 0;
+  if (x===0) return 0;
+  if (x===1) return 1;
+  const lbeta = lgamma(a)+lgamma(b)-lgamma(a+b);
+  const front = Math.exp(Math.log(x)*a + Math.log(1-x)*b - lbeta)/a;
+  let c=1, d=1-((a+b)*x)/(a+1); d=1/d; let h=d;
+  for(let m=1;m<=100;m++){
+    let n1=m*(b-m)*x/((a+2*m-1)*(a+2*m)); d=1+n1*d; c=1+n1/c; d=1/d; h*=d*c;
+    let n2=-(a+m)*(a+b+m)*x/((a+2*m)*(a+2*m+1)); d=1+n2*d; c=1+n2/c; d=1/d; const del=d*c; h*=del;
+    if(Math.abs(del-1)<1e-10) break;
+  }
+  return front*h;
+}
+
+function lgamma(z) {
+  const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];
+  let y=z, x=z, tmp=x+5.5; tmp-=(x+0.5)*Math.log(tmp);
+  let ser=1.000000000190015;
+  for(let j=0;j<6;j++) ser+=c[j]/++y;
+  return -tmp+Math.log(2.5066282746310005*ser/x);
+}
+
+function normalCDF(z) {
+  return 0.5*(1+erf(z/Math.sqrt(2)));
+}
+
+function erf(x) {
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const t=1/(1+p*Math.abs(x));
+  const y=1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return x>=0 ? y : -y;
+}
+
+function cohensD(a, b) {
+  const ma=a.reduce((x,y)=>x+y,0)/a.length, mb=b.reduce((x,y)=>x+y,0)/b.length;
+  const sa=Math.sqrt(a.map(v=>(v-ma)**2).reduce((x,y)=>x+y,0)/a.length);
+  const sb=Math.sqrt(b.map(v=>(v-mb)**2).reduce((x,y)=>x+y,0)/b.length);
+  const pooled=Math.sqrt((sa**2+sb**2)/2);
+  return pooled ? (ma-mb)/pooled : 0;
+}
+
+function runStats(onArr, offArr) {
+  if (!onArr.length || !offArr.length) return null;
+  const useT = isNormal(onArr) && isNormal(offArr);
+  const tt = tTest(onArr, offArr);
+  const ww = useT ? null : wilcoxon(onArr, offArr);
+  const d = cohensD(onArr, offArr);
+  const p = useT ? tt.p : (ww?.p ?? NaN);
+  return { ma:tt.ma, mb:tt.mb, delta:tt.ma-tt.mb, deltaPct:tt.mb ? (tt.ma-tt.mb)/tt.mb*100 : 0,
+    ci:tt.ci, p, d, method:useT?'t-test':'Wilcoxon', sig: !isNaN(p) && p < 0.05 };
+}
+
+// ═══ METABOLIC STATE CLASSIFIER ═══════════════
+function classifyState(dt) {
+  const h = dt.getHours(), m = dt.getMinutes();
+  const t = h + m/60;
+  if (t >= 0   && t < 4)   return 'nocturnal';
+  if (t >= 6   && t < 10)  return 'fasting';
+  if (t >= 7   && t < 10)  return 'postprandial-breakfast';
+  if (t >= 12  && t < 14)  return 'postprandial-lunch';
+  if (t >= 18  && t < 21)  return 'postprandial-dinner';
+  return 'other';
+}
+
+// ═══ AUC COMPUTATION ══════════════════════════
+function auc(data, hoursWindow) {
+  const BASE = 70;
+  const pts = data.sort((a,b)=>a.datetime-b.datetime);
+  if (pts.length < 2) return 0;
+  let total = 0;
+  for (let i=1; i<pts.length; i++) {
+    const dt = (pts[i].datetime - pts[i-1].datetime) / 3600000;
+    if (dt > hoursWindow) continue;
+    const h1 = Math.max(0, pts[i-1].value - BASE);
+    const h2 = Math.max(0, pts[i].value   - BASE);
+    total += (h1 + h2) / 2 * dt;
+  }
+  return total;
+}
+
+// ═══ COMPLIANCE SCORER ════════════════════════
+function scoreCompliance(onData, refOffData) {
+  if (!onData.length || !refOffData.length) return 0.5;
+  const fastON  = onData.filter(d=>{ const h=d.datetime.getHours(); return h>=6&&h<10; }).map(d=>d.value);
+  const fastOFF = refOffData.filter(d=>{ const h=d.datetime.getHours(); return h>=6&&h<10; }).map(d=>d.value);
+  if (!fastON.length || !fastOFF.length) return 0.5;
+  const mON  = fastON.reduce((a,b)=>a+b,0)/fastON.length;
+  const mOFF = fastOFF.reduce((a,b)=>a+b,0)/fastOFF.length;
+  const suppression = (mOFF - mON) / mOFF;
+  return Math.min(1, Math.max(0, 0.5 + suppression * 2));
+}
+
+// ═══ PREP DATA ════════════════════════════════
+function getProcessedData(vid) {
+  const st  = STATE[vid];
+  const cp  = st.cycleProtocol;
+  const user = st.users.find(u => u.id === st.activeId);
+  if (!user) return [];
+  let data = [...user.data];
+  if (cp.skipWarmup) {
+    const minDt = new Date(Math.min(...data.map(d=>d.datetime)));
+    const cutoff = new Date(minDt.getTime() + 86400000);
+    data = data.filter(d => d.datetime >= cutoff);
+  }
+  if (cp.suppressOutl) data = suppressOutliers(data);
+  if (cp.smoothing && cp.smoothing !== 'none') data = smoothData(data, cp.smoothing);
+  return data;
+}
+
+// ═══ MAGE ═════════════════════════════════════
+function calcMAGE(data) {
+  const vs = data.map(d=>d.value);
+  if (!vs.length) return 0;
+  const avg = vs.reduce((a,b)=>a+b,0)/vs.length;
+  const sd  = Math.sqrt(vs.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vs.length);
+  const exc=[]; let i=0;
+  while(i<vs.length){
+    if(vs[i]>avg+sd){let p=vs[i];while(i<vs.length&&vs[i]>avg){p=Math.max(p,vs[i]);i++;}exc.push(p-avg);}
+    else if(vs[i]<avg-sd){let n=vs[i];while(i<vs.length&&vs[i]<avg){n=Math.min(n,vs[i]);i++;}exc.push(avg-n);}
+    else i++;
+  }
+  return exc.length ? exc.reduce((a,b)=>a+b,0)/exc.length : sd*1.5;
+}
+
+// ═══ AGP PER PHASE ════════════════════════════
+function buildPhaseAGP(canvasId, data, label, borderColor, vid) {
+  destroyChart(vid, canvasId);
+  const canvas = $(canvasId); if (!canvas || !data.length) return;
+  const { tickColor, gridColor, monoFont } = chartDefaults(vid);
+  const buckets = Array.from({length:24},()=>[]);
+  data.forEach(d => buckets[d.datetime.getHours()].push(d.value));
+  const pct=(arr,p)=>{if(!arr.length)return null;const s=[...arr].sort((a,b)=>a-b);const idx=p/100*(s.length-1);const lo=Math.floor(idx),hi=Math.ceil(idx);return lo===hi?s[lo]:s[lo]+(s[hi]-s[lo])*(idx-lo);};
+  const hours=Array.from({length:24},(_,i)=>`${i}:00`);
+  const median=buckets.map(b=>pct(b,50));
+  const p75=buckets.map(b=>pct(b,75));
+  const p25=buckets.map(b=>pct(b,25));
+  const ctx=canvas.getContext('2d');
+  STATE[vid].charts[canvasId]=new Chart(ctx,{
+    type:'line',
+    data:{labels:hours,datasets:[
+      {label:'P75',data:p75,borderColor:borderColor+'55',backgroundColor:borderColor+'18',fill:'+1',borderWidth:1.5,borderDash:[3,3],pointRadius:0,tension:0.4},
+      {label:'P25',data:p25,borderColor:borderColor+'55',backgroundColor:'transparent',fill:false,borderWidth:1.5,borderDash:[3,3],pointRadius:0,tension:0.4},
+      {label:`${label} Median`,data:median,borderColor:borderColor,backgroundColor:'transparent',fill:false,borderWidth:2.5,pointRadius:2,tension:0.4},
+    ]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y!==null?`${c.dataset.label}: ${c.parsed.y.toFixed(1)} mg/dL`:''}}},
+      scales:{x:{ticks:{color:tickColor,font:{family:monoFont,size:9},maxRotation:0},grid:{color:gridColor}},
+        y:{ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>v+' mg/dL'},grid:{color:gridColor},suggestedMin:40,suggestedMax:280}}}
+  });
+}
+
+// ═══ CYCLE ANALYSIS MAIN ══════════════════════
+function buildCycleAnalysis(vid) {
+  const st  = STATE[vid];
+  const cp  = st.cycleProtocol;
+  if (!cp.enabled || !st.cycles.length) return;
+
+  const data = getProcessedData(vid);
+  if (!data.length) return;
+
+  const onData  = data.filter(d => { const c=getDataPhase(d,st.cycles); return c?.phase==='on'; });
+  const offData = data.filter(d => { const c=getDataPhase(d,st.cycles); return c?.phase==='off'; });
+
+  buildCycleStatTable(vid, onData, offData);
+  buildForestPlot(vid, onData, offData);
+  buildCycleTrendChart(vid, data, st.cycles);
+  buildDeltaCycleChart(vid, data, st.cycles);
+  buildCycleHeatmap(vid, data, st.cycles);
+  buildPhaseAGP('v1-agp-on-chart',  onData,  'ON',  '#059669', vid);
+  buildPhaseAGP('v1-agp-off-chart', offData, 'OFF', '#b45309', vid);
+  buildDeltaAGP(vid, onData, offData);
+  buildPPAUCChart(vid, onData, offData);
+  buildComplianceChart(vid, data, st.cycles);
+  buildProtoSummary(vid, data, st.cycles, onData, offData);
+
+  const cohortEl = $('v1-cohort-cycle-section');
+  if (cohortEl) cohortEl.style.display = st.users.length > 1 ? 'block' : 'none';
+  if (st.users.length > 1) buildCohortCycleCharts(vid);
+}
+
+// ═══ STAT TABLE ═══════════════════════════════
+function buildCycleStatTable(vid, onData, offData) {
+  const el = $('v1-cycle-stat-table');
+  if (!el) return;
+
+  const getMetrics = (d) => {
+    if (!d.length) return null;
+    const vs = d.map(x=>x.value);
+    const avg = vs.reduce((a,b)=>a+b,0)/vs.length;
+    const sd  = Math.sqrt(vs.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vs.length);
+    const fast = d.filter(x=>{const h=x.datetime.getHours();return h>=6&&h<10;}).map(x=>x.value);
+    const noct = d.filter(x=>{const h=x.datetime.getHours();return h>=0&&h<4;}).map(x=>x.value);
+    return {
+      'Avg Glucose':   avg,
+      'TIR (%)':       vs.filter(v=>v>=70&&v<=180).length/vs.length*100,
+      'CV (%)':        sd/avg*100,
+      'SD (mg/dL)':    sd,
+      'GMI (%)':       3.31+0.02392*avg,
+      'MAGE':          calcMAGE(d),
+      'Fasting Avg':   fast.length ? fast.reduce((a,b)=>a+b,0)/fast.length : NaN,
+      'Nocturnal Avg': noct.length ? noct.reduce((a,b)=>a+b,0)/noct.length : NaN,
+    };
+  };
+
+  const onM = getMetrics(onData);
+  const offM= getMetrics(offData);
+  if (!onM || !offM) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:16px">Insufficient data in one or both phases.</div>'; return; }
+
+  const rows = Object.keys(onM);
+  const stats = rows.map(k => {
+    const onArr  = k.includes('TIR')   ? [onM[k]]  : onData.map(d=>d.value);
+    const offArr = k.includes('TIR')   ? [offM[k]] : offData.map(d=>d.value);
+    return { k, on: onM[k], off: offM[k], s: runStats(onArr, offArr) };
+  });
+
+  el.innerHTML = `
+  <table class="stat-table">
+    <thead><tr>
+      <th>Metric</th><th>ON</th><th>OFF</th><th>Δ</th><th>Δ%</th>
+      <th>95% CI</th><th>Cohen's d</th><th>p-value</th><th>Method</th>
+    </tr></thead>
+    <tbody>${stats.map(({k,on,off,s})=>{
+      if(!s) return `<tr><td>${k}</td><td>${on.toFixed(1)}</td><td>${off.toFixed(1)}</td><td colspan="6" style="color:var(--muted)">—</td></tr>`;
+      const sig = s.sig;
+      return `<tr>
+        <td style="font-weight:500">${k}</td>
+        <td style="color:var(--green);font-weight:600">${on.toFixed(1)}</td>
+        <td style="color:var(--amber);font-weight:600">${off.toFixed(1)}</td>
+        <td class="${s.delta<0?'stat-sig':'stat-ns'}">${s.delta>0?'+':''}${s.delta.toFixed(1)}</td>
+        <td class="${s.deltaPct<0?'stat-sig':'stat-ns'}">${s.deltaPct>0?'+':''}${s.deltaPct.toFixed(1)}%</td>
+        <td style="font-family:var(--font-mono);font-size:10px">[${s.ci[0].toFixed(1)}, ${s.ci[1].toFixed(1)}]</td>
+        <td style="font-family:var(--font-mono)">${s.d.toFixed(2)}</td>
+        <td class="${sig?'stat-sig':'stat-ns'}" style="font-weight:600">${isNaN(s.p)?'—':s.p<0.001?'<0.001':s.p.toFixed(3)}${sig?' *':''}</td>
+        <td style="color:var(--muted);font-size:10px">${s.method}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// ═══ FOREST PLOT ══════════════════════════════
+function buildForestPlot(vid, onData, offData) {
+  destroyChart(vid, 'forest');
+  const canvas = $('v1-forest-chart'); if (!canvas) return;
+  const { tickColor, gridColor, monoFont } = chartDefaults(vid);
+
+  const metrics = ['Avg Glucose','TIR','CV','SD','MAGE','Fasting','Nocturnal'];
+  const getVals = (d,k) => {
+    const vs=d.map(x=>x.value);
+    if(k==='TIR') return [vs.filter(v=>v>=70&&v<=180).length/vs.length*100];
+    if(k==='CV') return [Math.sqrt(vs.map(v=>(v-vs.reduce((a,b)=>a+b,0)/vs.length)**2).reduce((a,b)=>a+b,0)/vs.length)/( vs.reduce((a,b)=>a+b,0)/vs.length)*100];
+    if(k==='Fasting') return d.filter(x=>{const h=x.datetime.getHours();return h>=6&&h<10;}).map(x=>x.value);
+    if(k==='Nocturnal') return d.filter(x=>{const h=x.datetime.getHours();return h>=0&&h<4;}).map(x=>x.value);
+    if(k==='MAGE') return [calcMAGE(d)];
+    if(k==='SD') return [Math.sqrt(vs.map(v=>(v-vs.reduce((a,b)=>a+b,0)/vs.length)**2).reduce((a,b)=>a+b,0)/vs.length)];
+    return vs;
+  };
+
+  const ds = metrics.map(k => {
+    const a=getVals(onData,k), b=getVals(offData,k);
+    if(!a.length||!b.length) return null;
+    return { k, d: cohensD(a,b) };
+  }).filter(Boolean);
+
+  const ctx = canvas.getContext('2d');
+  STATE[vid].charts['forest'] = new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels: ds.map(d=>d.k),
+      datasets:[{
+        label:"Cohen's d",
+        data: ds.map(d=>d.d),
+        backgroundColor: ds.map(d=>Math.abs(d.d)>=0.8?'rgba(5,150,105,0.7)':Math.abs(d.d)>=0.5?'rgba(180,83,9,0.7)':'rgba(122,143,171,0.5)'),
+        borderColor: ds.map(d=>Math.abs(d.d)>=0.8?'#059669':Math.abs(d.d)>=0.5?'#b45309':'#7a8fab'),
+        borderWidth:1.5, borderRadius:3
+      }]
+    },
+    options:{
+      indexAxis:'y', responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`d = ${c.parsed.x.toFixed(2)} (${Math.abs(c.parsed.x)>=0.8?'Large':Math.abs(c.parsed.x)>=0.5?'Medium':'Small'})`}}},
+      scales:{
+        x:{ticks:{color:tickColor,font:{family:monoFont,size:9}},grid:{color:gridColor},title:{display:true,text:"Cohen's d",color:tickColor,font:{family:monoFont,size:9}}},
+        y:{ticks:{color:tickColor,font:{family:monoFont,size:9}},grid:{display:false}}
+      }
+    }
+  });
+}
+
+// ═══ CYCLE TREND ══════════════════════════════
+function buildCycleTrendChart(vid, data, cycles) {
+  destroyChart(vid, 'cycle-trend');
+  const canvas=$('v1-cycle-trend-chart'); if(!canvas) return;
+  const {tickColor,gridColor,monoFont}=chartDefaults(vid);
+
+  const cycleNums=[...new Set(cycles.map(c=>c.n))].sort((a,b)=>a-b);
+  const onAvgs=[], offAvgs=[];
+  cycleNums.forEach(n=>{
+    const onC=cycles.find(c=>c.n===n&&c.phase==='on');
+    const offC=cycles.find(c=>c.n===n&&c.phase==='off');
+    const getA=(c)=>{ if(!c) return null; const d=data.filter(x=>x.datetime>=c.start&&x.datetime<c.end); return d.length?d.reduce((a,b)=>a+b.value,0)/d.length:null; };
+    onAvgs.push(getA(onC)); offAvgs.push(getA(offC));
+  });
+
+  const ctx=canvas.getContext('2d');
+  STATE[vid].charts['cycle-trend']=new Chart(ctx,{
+    type:'line',
+    data:{labels:cycleNums.map(n=>`Cycle ${n}`),datasets:[
+      {label:'ON Avg',data:onAvgs,borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.1)',borderWidth:2,pointRadius:4,tension:0.3},
+      {label:'OFF Avg',data:offAvgs,borderColor:'#b45309',backgroundColor:'rgba(180,83,9,0.1)',borderWidth:2,pointRadius:4,tension:0.3,borderDash:[5,4]},
+    ]},
+    options:{responsive:true,plugins:{legend:{display:true,labels:{color:tickColor,font:{family:monoFont,size:10},boxWidth:10}}},
+      scales:{x:{ticks:{color:tickColor,font:{family:monoFont,size:9}},grid:{color:gridColor}},
+        y:{ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>v+' mg/dL'},grid:{color:gridColor}}}}
+  });
+}
+
+// ═══ DELTA CYCLE ══════════════════════════════
+function buildDeltaCycleChart(vid, data, cycles) {
+  destroyChart(vid, 'delta-cycle');
+  const canvas=$('v1-delta-cycle-chart'); if(!canvas) return;
+  const {tickColor,gridColor,monoFont}=chartDefaults(vid);
+
+  const cycleNums=[...new Set(cycles.map(c=>c.n))].sort((a,b)=>a-b);
+  const deltas=cycleNums.map(n=>{
+    const onC=cycles.find(c=>c.n===n&&c.phase==='on');
+    const offC=cycles.find(c=>c.n===n&&c.phase==='off');
+    if(!onC||!offC) return null;
+    const onD=data.filter(x=>x.datetime>=onC.start&&x.datetime<onC.end);
+    const offD=data.filter(x=>x.datetime>=offC.start&&x.datetime<offC.end);
+    if(!onD.length||!offD.length) return null;
+    const mOn=onD.reduce((a,b)=>a+b.value,0)/onD.length;
+    const mOff=offD.reduce((a,b)=>a+b.value,0)/offD.length;
+    return mOn-mOff;
+  });
+
+  const ctx=canvas.getContext('2d');
+  STATE[vid].charts['delta-cycle']=new Chart(ctx,{
+    type:'bar',
+    data:{labels:cycleNums.map(n=>`Cycle ${n}`),datasets:[{
+      label:'ON − OFF (mg/dL)',data:deltas,
+      backgroundColor:deltas.map(d=>d===null?'rgba(0,0,0,0)':d<0?'rgba(5,150,105,0.7)':'rgba(220,38,38,0.7)'),
+      borderColor:deltas.map(d=>d===null?'transparent':d<0?'#059669':'#dc2626'),
+      borderWidth:1.5,borderRadius:4,borderSkipped:false
+    }]},
+    options:{responsive:true,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>c.parsed.y!==null?`Δ ${c.parsed.y>0?'+':''}${c.parsed.y.toFixed(1)} mg/dL`:'No data'}}},
+      scales:{x:{ticks:{color:tickColor,font:{family:monoFont,size:9}},grid:{display:false}},
+        y:{ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>(v>0?'+':'')+v+' mg/dL'},grid:{color:gridColor}}}}
+  });
+}
+
+// ═══ CYCLE HEATMAP ════════════════════════════
+function buildCycleHeatmap(vid, data, cycles) {
+  const el=$('v1-cycle-heatmap'); if(!el) return;
+  const cycleList=[...new Set(cycles.map(c=>c.n))].sort((a,b)=>a-b);
+  const hrs=Array.from({length:24},(_,i)=>i);
+
+  const gColor=(v)=>{
+    if(v===null) return '#f0f4f9';
+    if(v<70) return `hsl(0,80%,${40+Math.round((70-v)/30*20)}%)`;
+    if(v>180) return `hsl(30,80%,${40+Math.round((v-180)/70*20)}%)`;
+    const t=(v-70)/110; return `hsl(${140-t*30},70%,${45+t*10}%)`;
+  };
+
+  const headerRow = `<div style="display:flex;gap:1px;margin-bottom:2px;align-items:center">
+    <div style="width:56px;font-size:9px;color:var(--muted);font-family:var(--font-mono)">Cycle</div>
+    ${hrs.map(h=>`<div style="width:10px;text-align:center;font-size:8px;color:var(--muted);font-family:var(--font-mono)">${h%6===0?h:''}</div>`).join('')}
+  </div>`;
+
+  const rows = cycleList.map(n => {
+    const c = cycles.find(cc=>cc.n===n&&cc.phase==='on') || cycles.find(cc=>cc.n===n);
+    const phase = c?.phase ?? 'on';
+    const cells = hrs.map(h => {
+      const pts = data.filter(d=>{const dc=getDataPhase(d,cycles);return dc?.n===n&&d.datetime.getHours()===h;}).map(d=>d.value);
+      const avg = pts.length ? pts.reduce((a,b)=>a+b,0)/pts.length : null;
+      return `<div class="heatmap-cell" style="background:${gColor(avg)}" title="Cycle ${n} ${h}:00 — ${avg!==null?avg.toFixed(0)+' mg/dL':'no data'}"></div>`;
+    }).join('');
+    return `<div style="display:flex;gap:1px;margin-bottom:1px;align-items:center">
+      <div style="width:56px;font-size:9px;font-family:var(--font-mono);color:${phase==='on'?'var(--green)':'var(--amber)'};font-weight:600">C${n} ${phase.toUpperCase()}</div>
+      ${cells}
+    </div>`;
+  }).join('');
+
+  const legend = `<div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:10px;font-family:var(--font-mono);color:var(--muted)">
+    <div style="background:#dc2626;width:10px;height:10px;border-radius:2px"></div>Low
+    <div style="background:#22c55e;width:10px;height:10px;border-radius:2px"></div>In Range
+    <div style="background:#f97316;width:10px;height:10px;border-radius:2px"></div>High
+    <div style="background:#f0f4f9;width:10px;height:10px;border-radius:2px;border:1px solid #dde3ed"></div>No data
+  </div>`;
+
+  el.innerHTML = headerRow + rows + legend;
+}
+
+// ═══ DELTA AGP ════════════════════════════════
+function buildDeltaAGP(vid, onData, offData) {
+  destroyChart(vid, 'agp-delta');
+  const canvas=$('v1-agp-delta-chart'); if(!canvas) return;
+  const {tickColor,gridColor,monoFont}=chartDefaults(vid);
+  const pct=(arr,p)=>{if(!arr.length)return null;const s=[...arr].sort((a,b)=>a-b);const idx=p/100*(s.length-1);const lo=Math.floor(idx),hi=Math.ceil(idx);return lo===hi?s[lo]:s[lo]+(s[hi]-s[lo])*(idx-lo);};
+  const onB=Array.from({length:24},()=>[]), offB=Array.from({length:24},()=>[]);
+  onData.forEach(d=>onB[d.datetime.getHours()].push(d.value));
+  offData.forEach(d=>offB[d.datetime.getHours()].push(d.value));
+  const delta=Array.from({length:24},(_,i)=>{ const a=pct(onB[i],50),b=pct(offB[i],50); return (a!==null&&b!==null)?a-b:null; });
+  const ctx=canvas.getContext('2d');
+  STATE[vid].charts['agp-delta']=new Chart(ctx,{
+    type:'line',
+    data:{labels:Array.from({length:24},(_,i)=>`${i}:00`),datasets:[
+      {label:'Delta Median',data:delta,borderColor:'#7c3aed',backgroundColor:delta.map(v=>v===null?'transparent':v<0?'rgba(5,150,105,0.15)':'rgba(220,38,38,0.15)'),fill:true,borderWidth:2,pointRadius:2,tension:0.4},
+      {label:'Zero',data:Array(24).fill(0),borderColor:'rgba(122,143,171,0.4)',borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,tension:0}
+    ]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y!==null?`Δ ${c.parsed.y>0?'+':''}${c.parsed.y.toFixed(1)} mg/dL`:'—'}}},
+      scales:{x:{ticks:{color:tickColor,font:{family:monoFont,size:9},maxRotation:0},grid:{color:gridColor}},
+        y:{ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>(v>0?'+':'')+v+' mg/dL'},grid:{color:gridColor}}}}
+  });
+}
+
+// ═══ POSTPRANDIAL AUC ═════════════════════════
+function buildPPAUCChart(vid, onData, offData) {
+  destroyChart(vid, 'ppauc');
+  const canvas=$('v1-ppauc-chart'); if(!canvas) return;
+  const {tickColor,gridColor,monoFont}=chartDefaults(vid);
+
+  const windows=[
+    {label:'Breakfast (6–9)',hours:[6,7,8]},
+    {label:'Lunch (11–14)',hours:[11,12,13]},
+    {label:'Dinner (17–20)',hours:[17,18,19]},
+  ];
+
+  const calcAUCWindow=(data,hours)=>{
+    const pts=data.filter(d=>hours.includes(d.datetime.getHours()));
+    return auc(pts,3);
+  };
+
+  const onAUC2=windows.map(w=>calcAUCWindow(onData,w.hours));
+  const offAUC2=windows.map(w=>calcAUCWindow(offData,w.hours));
+
+  const ctx=canvas.getContext('2d');
+  STATE[vid].charts['ppauc']=new Chart(ctx,{
+    type:'bar',
+    data:{labels:windows.map(w=>w.label),datasets:[
+      {label:'ON (AUC)',data:onAUC2,backgroundColor:'rgba(5,150,105,0.65)',borderColor:'#059669',borderWidth:1.5,borderRadius:4},
+      {label:'OFF (AUC)',data:offAUC2,backgroundColor:'rgba(180,83,9,0.65)',borderColor:'#b45309',borderWidth:1.5,borderRadius:4},
+    ]},
+    options:{responsive:true,plugins:{legend:{display:true,labels:{color:tickColor,font:{family:monoFont,size:10},boxWidth:10}},
+      tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toFixed(1)} mg·h/dL`}}},
+      scales:{x:{ticks:{color:tickColor,font:{family:monoFont,size:9},maxRotation:0},grid:{display:false}},
+        y:{ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>v+' mg·h/dL'},grid:{color:gridColor}}}}
+  });
+}
+
+// ═══ COMPLIANCE CHART ═════════════════════════
+function buildComplianceChart(vid, data, cycles) {
+  destroyChart(vid, 'compliance');
+  const canvas=$('v1-compliance-chart'); if(!canvas) return;
+  const {tickColor,gridColor,monoFont}=chartDefaults(vid);
+
+  const onCycles=cycles.filter(c=>c.phase==='on');
+  const refOff=data.filter(d=>{ const c=getDataPhase(d,cycles); return c?.phase==='off'; });
+
+  const scores=onCycles.map(c=>{
+    const onD=data.filter(x=>x.datetime>=c.start&&x.datetime<c.end);
+    return {n:c.n, score:scoreCompliance(onD,refOff)};
+  });
+
+  const ctx=canvas.getContext('2d');
+  STATE[vid].charts['compliance']=new Chart(ctx,{
+    type:'bar',
+    data:{labels:scores.map(s=>`Cycle ${s.n}`),datasets:[{
+      label:'Compliance Probability',
+      data:scores.map(s=>Math.round(s.score*100)),
+      backgroundColor:scores.map(s=>s.score>=0.7?'rgba(5,150,105,0.7)':s.score>=0.4?'rgba(180,83,9,0.7)':'rgba(220,38,38,0.7)'),
+      borderColor:scores.map(s=>s.score>=0.7?'#059669':s.score>=0.4?'#b45309':'#dc2626'),
+      borderWidth:1.5,borderRadius:4,borderSkipped:false
+    }]},
+    options:{responsive:true,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>`${c.parsed.y}% — ${c.parsed.y>=70?'High compliance':c.parsed.y>=40?'Moderate':'Low compliance'}`}}},
+      scales:{x:{ticks:{color:tickColor,font:{family:monoFont,size:9}},grid:{display:false}},
+        y:{min:0,max:100,ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>v+'%'},grid:{color:gridColor}}}}
+  });
+}
+
+// ═══ COHORT CYCLE CHARTS ══════════════════════
+function buildCohortCycleCharts(vid) {
+  buildCohortMAGEChart(vid);
+  buildCohortTIRChart(vid);
+}
+
+function buildCohortMAGEChart(vid) {
+  destroyChart(vid, 'cohort-mage');
+  const canvas=$('v1-cohort-mage-chart'); if(!canvas) return;
+  const {tickColor,gridColor,monoFont}=chartDefaults(vid);
+  const st=STATE[vid];
+  const users=st.users.filter(u=>u.data.length>0);
+  const onMAGE=users.map(u=>calcMAGE(u.data.filter(d=>{const c=getDataPhase(d,st.cycles);return c?.phase==='on';})));
+  const offMAGE=users.map(u=>calcMAGE(u.data.filter(d=>{const c=getDataPhase(d,st.cycles);return c?.phase==='off';})));
+  const ctx=canvas.getContext('2d');
+  STATE[vid].charts['cohort-mage']=new Chart(ctx,{
+    type:'bar',
+    data:{labels:users.map(u=>u.name),datasets:[
+      {label:'ON MAGE',data:onMAGE,backgroundColor:'rgba(5,150,105,0.7)',borderColor:'#059669',borderWidth:1.5,borderRadius:4},
+      {label:'OFF MAGE',data:offMAGE,backgroundColor:'rgba(180,83,9,0.7)',borderColor:'#b45309',borderWidth:1.5,borderRadius:4},
+    ]},
+    options:{responsive:true,plugins:{legend:{display:true,labels:{color:tickColor,font:{family:monoFont,size:10},boxWidth:10}}},
+      scales:{x:{ticks:{color:tickColor,font:{family:monoFont,size:9},maxRotation:30},grid:{display:false}},
+        y:{ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>v+' mg/dL'},grid:{color:gridColor}}}}
+  });
+}
+
+function buildCohortTIRChart(vid) {
+  destroyChart(vid, 'cohort-tir');
+  const canvas=$('v1-cohort-tir-chart'); if(!canvas) return;
+  const {tickColor,gridColor,monoFont}=chartDefaults(vid);
+  const st=STATE[vid];
+  const users=st.users.filter(u=>u.data.length>0);
+  const onTIR=users.map(u=>{ const d=u.data.filter(x=>{const c=getDataPhase(x,st.cycles);return c?.phase==='on';}); return d.length?d.filter(x=>x.value>=70&&x.value<=180).length/d.length*100:0; });
+  const offTIR=users.map(u=>{ const d=u.data.filter(x=>{const c=getDataPhase(x,st.cycles);return c?.phase==='off';}); return d.length?d.filter(x=>x.value>=70&&x.value<=180).length/d.length*100:0; });
+  const ctx=canvas.getContext('2d');
+  STATE[vid].charts['cohort-tir']=new Chart(ctx,{
+    type:'bar',
+    data:{labels:users.map(u=>u.name),datasets:[
+      {label:'ON TIR%',data:onTIR,backgroundColor:'rgba(5,150,105,0.7)',borderColor:'#059669',borderWidth:1.5,borderRadius:4},
+      {label:'OFF TIR%',data:offTIR,backgroundColor:'rgba(180,83,9,0.7)',borderColor:'#b45309',borderWidth:1.5,borderRadius:4},
+    ]},
+    options:{responsive:true,plugins:{legend:{display:true,labels:{color:tickColor,font:{family:monoFont,size:10},boxWidth:10}}},
+      scales:{x:{ticks:{color:tickColor,font:{family:monoFont,size:9},maxRotation:30},grid:{display:false}},
+        y:{min:0,max:100,ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>v+'%'},grid:{color:gridColor}}}}
+  });
+}
+
+// ═══ PROTOCOL SUMMARY ═════════════════════════
+function buildProtoSummary(vid, data, cycles, onData, offData) {
+  const el=$('v1-proto-summary-body'); if(!el) return;
+  const cp=STATE[vid].cycleProtocol;
+  const nCycles=[...new Set(cycles.map(c=>c.n))].length;
+  const onDays=[...new Set(onData.map(d=>toDate(d.datetime)))].length;
+  const offDays=[...new Set(offData.map(d=>toDate(d.datetime)))].length;
+  const gapDays = nCycles*(cp.onDays+cp.offDays) - onDays - offDays;
+  const sorted=[...data].sort((a,b)=>a.datetime-b.datetime);
+  const sensorGaps = [];
+  for(let i=1;i<sorted.length;i++){
+    const gap=(sorted[i].datetime-sorted[i-1].datetime)/60000;
+    if(gap>30) sensorGaps.push(gap);
+  }
+
+  const cards=[
+    ['Cycles',nCycles,'','var(--accent)'],
+    ['ON days recorded',onDays,'days','var(--green)'],
+    ['OFF days recorded',offDays,'days','var(--amber)'],
+    ['Missing day-equiv',Math.max(0,gapDays),'days','var(--muted)'],
+    ['Sensor gaps >30min',sensorGaps.length,'gaps','var(--red)'],
+    ['Total readings',data.length.toLocaleString(),'pts','var(--text2)'],
+    ['Avg ON glucose',onData.length?(onData.reduce((a,b)=>a+b.value,0)/onData.length).toFixed(1):'—','mg/dL','var(--green)'],
+    ['Avg OFF glucose',offData.length?(offData.reduce((a,b)=>a+b.value,0)/offData.length).toFixed(1):'—','mg/dL','var(--amber)'],
+  ];
+
+  el.innerHTML=cards.map(([label,val,unit,color])=>`
+    <div class="metric-card" style="padding:12px 14px">
+      <div class="metric-accent-line" style="background:${color}"></div>
+      <div class="metric-label" style="font-size:10px">${label}</div>
+      <div class="metric-value" style="font-size:20px;color:${color}">${val}</div>
+      <div class="metric-unit">${unit}</div>
+    </div>`).join('');
+}
+
+// ═══ RESEARCH MODE ════════════════════════════
+function toggleResearchMode(force) {
+  const on = force !== undefined ? force : !document.body.classList.contains('research-mode');
+  document.body.classList.toggle('research-mode', on);
+  const btn=$('v1-rm-toggle');
+  if(btn){ btn.style.background = on ? 'var(--purple)' : ''; btn.style.color = on ? '#fff' : ''; btn.style.borderColor = on ? 'var(--purple)' : ''; }
+  const chk=$('proto-research-mode'); if(chk) chk.checked=on;
+}
+
+// ═══ ENHANCED EXPORT ══════════════════════════
+function exportCycleCSV(vid) {
+  const st=STATE[vid];
+  if(!st.cycles.length) return alert('Enable Cycle Protocol first.');
+  const activeUser=st.users.find(u=>u.id===st.activeId);
+  if(!activeUser) return;
+
+  const rows=activeUser.data.map(d=>{
+    const c=getDataPhase(d,st.cycles);
+    const state=classifyState(d.datetime);
+    return [
+      fmtDt(d.datetime), d.value,
+      c?c.phase:'none', c?c.n:'', state,
+      d.value<70?'Low':d.value>180?'High':'Normal',
+      d.value<20||d.value>700?'IMPLAUSIBLE':''
+    ].join(',');
+  });
+  const hdr='Timestamp,Glucose_mgdL,Cycle_Phase,Cycle_N,Metabolic_State,Status,Flag';
+  const blob=new Blob([[hdr,...rows].join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cycle-aligned-data.csv'; a.click();
+}
+
+function exportPerDayCSV(vid) {
+  const st=STATE[vid];
+  const activeUser=st.users.find(u=>u.id===st.activeId);
+  if(!activeUser) return;
+  const byDay={};
+  activeUser.data.forEach(d=>{
+    const k=toDate(d.datetime);
+    if(!byDay[k]) byDay[k]={date:k,readings:[],phase:'none',cycleN:''};
+    byDay[k].readings.push(d);
+    const c=getDataPhase(d,st.cycles);
+    if(c){byDay[k].phase=c.phase;byDay[k].cycleN=c.n;}
+  });
+  const hdr='Date,Phase,Cycle_N,Readings,Avg_mgdL,TIR_pct,TBR_pct,TAR_pct,SD,GMI,MAGE';
+  const rows=Object.values(byDay).sort((a,b)=>a.date.localeCompare(b.date)).map(day=>{
+    const vs=day.readings.map(d=>d.value);
+    const avg=vs.reduce((a,b)=>a+b,0)/vs.length;
+    const sd=Math.sqrt(vs.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vs.length);
+    return [day.date,day.phase,day.cycleN,vs.length,avg.toFixed(1),
+      (vs.filter(v=>v>=70&&v<=180).length/vs.length*100).toFixed(1),
+      (vs.filter(v=>v<70).length/vs.length*100).toFixed(1),
+      (vs.filter(v=>v>180).length/vs.length*100).toFixed(1),
+      sd.toFixed(1),(3.31+0.02392*avg).toFixed(2),calcMAGE(day.readings).toFixed(1)].join(',');
+  });
+  const blob=new Blob([[hdr,...rows].join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='per-day-summary.csv'; a.click();
+}
+
+function exportPerCycleCSV(vid) {
+  const st=STATE[vid];
+  if(!st.cycles.length) return alert('Enable Cycle Protocol first.');
+  const activeUser=st.users.find(u=>u.id===st.activeId);
+  if(!activeUser) return;
+  const hdr='Cycle_N,Phase,Start,End,Readings,Avg_mgdL,TIR_pct,SD,MAGE,Fasting_Avg,Compliance_Score';
+  const rows=st.cycles.map(c=>{
+    const d=activeUser.data.filter(x=>x.datetime>=c.start&&x.datetime<c.end);
+    if(!d.length) return null;
+    const vs=d.map(x=>x.value);
+    const avg=vs.reduce((a,b)=>a+b,0)/vs.length;
+    const sd=Math.sqrt(vs.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vs.length);
+    const fast=d.filter(x=>{const h=x.datetime.getHours();return h>=6&&h<10;});
+    const refOff=activeUser.data.filter(x=>{const cc=getDataPhase(x,st.cycles);return cc?.phase==='off';});
+    return [c.n,c.phase,toDate(c.start),toDate(c.end),vs.length,avg.toFixed(1),
+      (vs.filter(v=>v>=70&&v<=180).length/vs.length*100).toFixed(1),sd.toFixed(1),
+      calcMAGE(d).toFixed(1),
+      fast.length?(fast.reduce((a,b)=>a+b.value,0)/fast.length).toFixed(1):'',
+      (scoreCompliance(d,refOff)*100).toFixed(0)+'%'].join(',');
+  }).filter(Boolean);
+  const blob=new Blob([[hdr,...rows].join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='per-cycle-summary.csv'; a.click();
+}
+
+function exportTidyCSV(vid) {
+  const st=STATE[vid];
+  const hdr='subject,timestamp,glucose_mgdL,cycle_phase,cycle_n,metabolic_state,is_on,is_fasting,is_nocturnal,is_postprandial,tir_flag';
+  const rows=st.users.flatMap(u=>u.data.map(d=>{
+    const c=getDataPhase(d,st.cycles);
+    const ms=classifyState(d.datetime);
+    return [
+      `"${u.name}"`,fmtDt(d.datetime),d.value,
+      c?c.phase:'',c?c.n:'',ms,
+      c?.phase==='on'?1:0,
+      ms==='fasting'?1:0,ms==='nocturnal'?1:0,ms.startsWith('postprandial')?1:0,
+      d.value>=70&&d.value<=180?1:0
+    ].join(',');
+  }));
+  const blob=new Blob([[hdr,...rows].join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tidy-format.csv'; a.click();
+}
+
+function exportJSON(vid) {
+  const st=STATE[vid];
+  const cp=st.cycleProtocol;
+  const out={
+    metadata:{exportedAt:new Date().toISOString(),protocol:cp,nCycles:st.cycles.length},
+    cycles:st.cycles.map(c=>({...c,start:c.start.toISOString(),end:c.end.toISOString()})),
+    subjects:st.users.map(u=>({
+      name:u.name,color:u.color,nReadings:u.data.length,
+      metformin:u.metformin,
+      data:u.data.map(d=>({
+        t:d.datetime.toISOString(),v:d.value,
+        phase:getDataPhase(d,st.cycles)?.phase??null,
+        cycleN:getDataPhase(d,st.cycles)?.n??null,
+        state:classifyState(d.datetime)
+      }))
+    }))
+  };
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lingocgm-research.json'; a.click();
+}
+
 // ─── BUILD COMPARE on tab click ───────────────
 function buildCompareChart() { buildCompareOverlay('v1'); buildCompareOverlay('v2'); }
 
@@ -4742,6 +5576,42 @@ const GLOSSARY = {
     def: 'A defined window between the end of pre-treatment monitoring and confirmed stable metformin blood levels. During titration (typically weeks 1–4), metformin has not yet reached steady state and readings are neither clearly "pre" nor "on" treatment. Excluding this period prevents contaminating either analysis window.',
     formula: 'Readings in washout window excluded from both pre & post analysis',
     target: 'Typical washout: 1–4 weeks post-initiation during titration'
+  },
+  AUC: {
+    term: 'AUC — Area Under the Curve',
+    def: 'The integrated glucose exposure above a baseline (70 mg/dL) over a time window, computed by the trapezoidal rule. Used to quantify postprandial glucose burden. A lower AUC on metformin indicates reduced postprandial hyperglycemia.',
+    formula: 'AUC = Σ [(G(t₁)−70 + G(t₂)−70)/2] × Δt  (trapezoidal)',
+    target: 'Target: minimize postprandial AUC, especially in first 2–3 hours'
+  },
+  CYCLE: {
+    term: 'Treatment Cycle (ON/OFF)',
+    def: 'A structured research protocol where a subject alternates between defined ON (treatment) and OFF (control/washout) periods. This within-subject crossover design controls for confounders and enables paired statistical comparison.',
+    formula: 'Cycle N = ON period (days 1–k) + OFF period (days k+1–k+j)',
+    target: 'Minimum 5 cycles recommended for robust paired statistics'
+  },
+  COMPLIANCE: {
+    term: 'Compliance Probability Score',
+    def: 'An estimated probability (0–100%) that a subject actually took their medication during an ON cycle, inferred from CGM patterns. A compliant ON cycle shows suppressed fasting glucose, reduced nocturnal glucose, and lower postprandial AUC compared to the reference OFF pattern.',
+    formula: 'Score = 0.5 + (ΔFasting_suppression × 2), clamped 0–1',
+    target: '>70% = high compliance, 40–70% = moderate, <40% = probable non-compliance'
+  },
+  LOESS: {
+    term: 'LOESS — Locally Estimated Scatterplot Smoothing',
+    def: 'A non-parametric regression method that fits a smooth curve by computing weighted local polynomial regressions for each data point. Used in CGM to remove high-frequency sensor noise while preserving physiologically meaningful glucose trends. Span parameter controls smoothness.',
+    formula: 'ŷ(x₀) = weighted polynomial fit using k nearest neighbors',
+    target: 'Span 0.05–0.15 recommended for 5-min CGM data'
+  },
+  DELTA_AGP: {
+    term: 'Delta-AGP (ON − OFF)',
+    def: 'The hour-by-hour difference between the ON-cycle median glucose profile and the OFF-cycle median glucose profile. Negative values indicate metformin reduced glucose at that hour. The nocturnal and fasting windows typically show the largest suppression.',
+    formula: 'ΔAGP(h) = Median_ON(h) − Median_OFF(h)',
+    target: 'Expected: negative delta overnight and fasting, near-zero postprandial'
+  },
+  FOREST_PLOT: {
+    term: "Forest Plot (Effect Size)",
+    def: "A visualization showing the Cohen's d effect size for each metric, allowing rapid comparison of which outcomes were most affected by treatment. Green = large effect (≥0.8), amber = medium (0.5–0.8), grey = small (<0.5). Used in meta-analyses to compare effect sizes across studies.",
+    formula: "Point estimate = Cohen's d · Bar length = effect magnitude",
+    target: 'Large effects (d≥0.8) are clinically meaningful in CGM intervention studies'
   }
 };
 
