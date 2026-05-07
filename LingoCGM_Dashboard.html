@@ -1247,8 +1247,92 @@ tr:hover td { background: var(--surface2); }
   cursor: pointer;
   transition: opacity var(--tr);
 }
-.compare-pill.hidden { opacity: 0.35; }
+.compare-pill.hidden { opacity: 0.35; text-decoration: line-through; }
 .compare-pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+/* ─── RESEARCH PANEL ─── */
+.research-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+@media (max-width: 1200px) { .research-metrics-grid { grid-template-columns: repeat(3, 1fr); } }
+.research-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-badge {
+  font-size: 9px;
+  background: var(--purple-bg);
+  color: var(--purple);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.tir-5tier-wrap { margin-bottom: 4px; }
+.tir-5tier-bar {
+  display: flex;
+  height: 28px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.tir-5tier-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.tir-5tier-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text2);
+}
+.tir-5tier-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.research-table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.metric-card .metric-help {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.cv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+.cv-stable   { background: var(--green-bg);  color: var(--green); }
+.cv-moderate { background: var(--amber-bg);  color: var(--amber); }
+.cv-variable { background: var(--red-bg);    color: var(--red); }
+.tir-target-met   { color: var(--green); font-weight: 600; }
+.tir-target-miss  { color: var(--red);   font-weight: 600; }
+.tir-target-warn  { color: var(--amber); font-weight: 600; }
 
 </style>
 </head>
@@ -1316,6 +1400,10 @@ tr:hover td { background: var(--surface2); }
         <button class="nav-item" onclick="showView('v1','log',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           Reading Log
+        </button>
+        <button class="nav-item" onclick="showView('v1','research',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11m0 0a3 3 0 1 0 6 0m-6 0H5m4 0h10"/><circle cx="17" cy="17" r="3"/><line x1="20" y1="20" x2="22" y2="22"/></svg>
+          Research
         </button>
       </div>
 
@@ -1590,6 +1678,175 @@ tr:hover td { background: var(--surface2); }
             <div class="chart-card">
               <div class="chart-header"><div><div class="chart-title">Average Glucose by Subject</div></div></div>
               <canvas id="v1-cmp-avg-chart" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- RESEARCH VIEW -->
+        <div class="view-panel" id="v1-view-research">
+          <div class="page-header">
+            <div>
+              <div class="page-title">Metformin Efficacy Research</div>
+              <div class="page-sub">Extended glycemic metrics for treatment evaluation — based on ADA/EASD CGM consensus standards</div>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-sm" onclick="exportResearchCSV('v1')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export Research CSV
+              </button>
+            </div>
+          </div>
+
+          <!-- Glycemic Variability Metrics -->
+          <div class="research-section-title">Glycemic Variability Metrics <span class="section-badge">KEY INDICATORS</span></div>
+          <div class="research-metrics-grid">
+            <div class="metric-card mc-blue">
+              <div class="metric-accent-line"></div>
+              <div class="metric-label">GMI</div>
+              <div class="metric-value" id="v1-r-gmi">—</div>
+              <div class="metric-unit">%</div>
+              <div class="metric-help">Glucose Management Indicator — HbA1c estimate from CGM mean glucose. Target &lt;7.0% for T2D on metformin.</div>
+            </div>
+            <div class="metric-card mc-purple">
+              <div class="metric-accent-line"></div>
+              <div class="metric-label">CV</div>
+              <div class="metric-value" id="v1-r-cv">—</div>
+              <div class="metric-unit">%</div>
+              <div id="v1-r-cv-badge" class="cv-badge" style="display:none"></div>
+              <div class="metric-help">Coefficient of Variation (SD÷mean). &lt;36% = stable glycemic control. Metformin reduces CV by lowering fasting excursions.</div>
+            </div>
+            <div class="metric-card mc-amber">
+              <div class="metric-accent-line"></div>
+              <div class="metric-label">Std Deviation</div>
+              <div class="metric-value" id="v1-r-sd">—</div>
+              <div class="metric-unit">mg/dL</div>
+              <div class="metric-help">Standard deviation across all readings. Lower SD indicates more consistent glucose control achieved with treatment.</div>
+            </div>
+            <div class="metric-card mc-red">
+              <div class="metric-accent-line"></div>
+              <div class="metric-label">MAGE</div>
+              <div class="metric-value" id="v1-r-mage">—</div>
+              <div class="metric-unit">mg/dL</div>
+              <div class="metric-help">Mean Amplitude of Glycemic Excursions. Measures instability beyond 1 SD. Target &lt;140 mg/dL in treated T2D.</div>
+            </div>
+            <div class="metric-card mc-green">
+              <div class="metric-accent-line"></div>
+              <div class="metric-label">Fasting Glucose</div>
+              <div class="metric-value" id="v1-r-fasting">—</div>
+              <div class="metric-unit">mg/dL avg</div>
+              <div class="metric-help">Average 6–10 AM readings (fasting proxy). Metformin primarily reduces hepatic glucose output — expect fasting improvement first.</div>
+            </div>
+            <div class="metric-card" style="border-color:var(--border)">
+              <div class="metric-accent-line" style="background:#0891b2"></div>
+              <div class="metric-label">Nocturnal Avg</div>
+              <div class="metric-value" id="v1-r-nocturnal" style="color:#0891b2">—</div>
+              <div class="metric-unit">mg/dL (0–4 AM)</div>
+              <div class="metric-help">Overnight glucose mean. Persistently elevated nocturnal values may indicate hepatic insulin resistance despite daytime control.</div>
+            </div>
+          </div>
+
+          <!-- 5-Tier TIR -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <div class="chart-title">Extended Time in Range — 5-Tier ADA/EASD Breakdown</div>
+                <div class="chart-subtitle">Consensus targets for T2D: TIR &gt;70% · TBR (54–69) &lt;4% · TBR (&lt;54) &lt;1% · TAR (181–250) &lt;25% · TAR (&gt;250) &lt;5%</div>
+              </div>
+            </div>
+            <div class="tir-5tier-wrap">
+              <div class="tir-5tier-bar">
+                <div id="v1-tir5-tbr2" style="background:#7f1d1d;transition:width 0.4s ease;min-width:0" title="TBR Level 2 — Very Low (<54 mg/dL)"></div>
+                <div id="v1-tir5-tbr1" style="background:#dc2626;transition:width 0.4s ease;min-width:0" title="TBR Level 1 — Low (54–69 mg/dL)"></div>
+                <div id="v1-tir5-tir"  style="background:#059669;transition:width 0.4s ease;min-width:0" title="Time in Range (70–180 mg/dL)"></div>
+                <div id="v1-tir5-tar1" style="background:#b45309;transition:width 0.4s ease;min-width:0" title="TAR Level 1 — High (181–250 mg/dL)"></div>
+                <div id="v1-tir5-tar2" style="background:#78350f;transition:width 0.4s ease;min-width:0" title="TAR Level 2 — Very High (>250 mg/dL)"></div>
+              </div>
+              <div class="tir-5tier-legend">
+                <div class="tir-5tier-item">
+                  <div class="tir-5tier-swatch" style="background:#7f1d1d"></div>
+                  TBR L2 &lt;54 mg/dL: <strong id="v1-r-tbr2-pct" class="tir-target-met">—</strong>% <span style="color:var(--muted)">(target &lt;1%)</span>
+                </div>
+                <div class="tir-5tier-item">
+                  <div class="tir-5tier-swatch" style="background:#dc2626"></div>
+                  TBR L1 54–69 mg/dL: <strong id="v1-r-tbr1-pct" class="tir-target-met">—</strong>% <span style="color:var(--muted)">(target &lt;4%)</span>
+                </div>
+                <div class="tir-5tier-item">
+                  <div class="tir-5tier-swatch" style="background:#059669"></div>
+                  TIR 70–180 mg/dL: <strong id="v1-r-tir-pct" class="tir-target-met">—</strong>% <span style="color:var(--muted)">(target &gt;70%)</span>
+                </div>
+                <div class="tir-5tier-item">
+                  <div class="tir-5tier-swatch" style="background:#b45309"></div>
+                  TAR L1 181–250 mg/dL: <strong id="v1-r-tar1-pct" class="tir-target-met">—</strong>% <span style="color:var(--muted)">(target &lt;25%)</span>
+                </div>
+                <div class="tir-5tier-item">
+                  <div class="tir-5tier-swatch" style="background:#78350f"></div>
+                  TAR L2 &gt;250 mg/dL: <strong id="v1-r-tar2-pct" class="tir-target-met">—</strong>% <span style="color:var(--muted)">(target &lt;5%)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AGP Chart -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <div class="chart-title">Ambulatory Glucose Profile (AGP)</div>
+                <div class="chart-subtitle">Median glucose and interquartile range (25th–75th pct) by hour of day — reveals daily pattern and postprandial excursions</div>
+              </div>
+            </div>
+            <canvas id="v1-agp-chart" height="90"></canvas>
+            <div class="zoom-hint" style="margin-top:8px">Dashed lines = target range 70–180 mg/dL · Shaded band = IQR (25th–75th percentile) · Solid line = median</div>
+          </div>
+
+          <!-- Two charts -->
+          <div class="charts-row">
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Glucose by 3-Hour Time Block</div>
+                  <div class="chart-subtitle">Average glucose per 3-hour window — identifies postprandial hyperglycemia patterns</div>
+                </div>
+              </div>
+              <canvas id="v1-timeblock-chart" height="200"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <div class="chart-title">Daily TIR Trend</div>
+                  <div class="chart-subtitle">Time in range % per day — tracks longitudinal treatment response</div>
+                </div>
+              </div>
+              <canvas id="v1-tir-trend-chart" height="200"></canvas>
+            </div>
+          </div>
+
+          <!-- Subject Research Table -->
+          <div class="research-section-title" style="margin-top:4px">Per-Subject Research Summary <span class="section-badge">ALL SUBJECTS</span></div>
+          <div class="research-table-card">
+            <div class="table-controls">
+              <h3>Subject Comparison <span style="color:var(--muted);font-weight:400;font-size:11px">— full dataset for all loaded subjects</span></h3>
+            </div>
+            <div class="table-wrapper" style="max-height:none">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th title="Total number of CGM readings">Readings</th>
+                    <th title="Mean glucose across all readings">Avg (mg/dL)</th>
+                    <th title="Glucose Management Indicator — ADA HbA1c estimate from CGM">GMI (%)</th>
+                    <th title="Coefficient of Variation — target <36% for stable glycemia">CV (%)</th>
+                    <th title="Standard deviation of glucose values">SD (mg/dL)</th>
+                    <th title="Time in range 70–180 mg/dL — ADA target >70%">TIR (%)</th>
+                    <th title="Time below range <70 mg/dL — ADA target <4%">TBR (%)</th>
+                    <th title="Time above range >180 mg/dL — ADA target <25%">TAR (%)</th>
+                    <th title="Average fasting glucose 6–10 AM — key metformin efficacy marker">Fasting Avg</th>
+                    <th title="Number of unique calendar days with data">Days</th>
+                  </tr>
+                </thead>
+                <tbody id="v1-research-table-body">
+                  <tr><td colspan="11" class="empty-state">Load data to see research summary</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1948,9 +2205,10 @@ function showView(vid, view, btn) {
   const nav = document.querySelectorAll('#' + vid + ' .nav-item, #' + vid + ' .rt-nav-tab');
   nav.forEach(n => n.classList.remove('active'));
   btn.classList.add('active');
-  if (view === 'weekly') buildWeekView(vid);
-  if (view === 'compare') buildCompareCharts(vid);
-  if (view === 'log') renderTable(vid);
+  if (view === 'weekly')   buildWeekView(vid);
+  if (view === 'compare')  buildCompareCharts(vid);
+  if (view === 'log')      renderTable(vid);
+  if (view === 'research') updateResearchMetrics(vid);
 }
 
 // ─── UPLOAD / PARSE ────────────────────────────
@@ -2019,7 +2277,7 @@ function processData(rows, fileName, vid) {
   const id = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,5);
   const color = (vid === 'v2' ? DARK_COLORS : USER_COLORS)[st.users.length % 8];
   const name = fileName.replace(/\.csv$/i,'');
-  st.users.push({ id, name, color, data: parsed, filters: { range:'7d', tod:'all', alert:'all' } });
+  st.users.push({ id, name, color, data: parsed, hidden: false, filters: { range:'7d', tod:'all', alert:'all' } });
 
   const totalSkip = skipped.oor + skipped.nphy + skipped.bad + skipped.date;
   showDashboard(vid, id, { fileName, timeKey, valKey, total: rows.length, valid: parsed.length, totalSkip, skipped });
@@ -2242,6 +2500,8 @@ function updateMetrics(vid) {
 
     // Day summaries
     updateDaySummaries('v1', data);
+    // Research panel metrics (always kept up-to-date; charts only render when panel is active)
+    updateResearchMetrics('v1');
 
   } else {
     $('v2-m-avg').textContent = avg.toFixed(1);
@@ -2278,6 +2538,287 @@ function updateDaySummaries(vid, data) {
   };
   render(best, vid + '-best-days');
   render(worst, vid + '-worst-days');
+}
+
+// ─── RESEARCH METRICS ─────────────────────────
+function updateResearchMetrics(vid) {
+  if (vid !== 'v1') return;
+  const data = STATE[vid].filtered;
+  if (!data.length) return;
+
+  const vals = data.map(d => d.value);
+  const n    = vals.length;
+  const avg  = vals.reduce((a,b) => a+b, 0) / n;
+
+  // Standard deviation
+  const variance = vals.map(v => (v - avg) ** 2).reduce((a,b) => a+b, 0) / n;
+  const sd = Math.sqrt(variance);
+
+  // Coefficient of Variation
+  const cv = (sd / avg) * 100;
+
+  // GMI — ADA/EASD formula: 3.31 + 0.02392 × mean_glucose_mg/dL
+  const gmi = 3.31 + 0.02392 * avg;
+
+  // MAGE — mean amplitude of excursions > 1 SD
+  const excursions = [];
+  let i = 0;
+  while (i < vals.length) {
+    if (vals[i] > avg + sd) {
+      let peak = vals[i];
+      while (i < vals.length && vals[i] > avg) { peak = Math.max(peak, vals[i]); i++; }
+      excursions.push(peak - avg);
+    } else if (vals[i] < avg - sd) {
+      let nadir = vals[i];
+      while (i < vals.length && vals[i] < avg) { nadir = Math.min(nadir, vals[i]); i++; }
+      excursions.push(avg - nadir);
+    } else { i++; }
+  }
+  const mage = excursions.length ? excursions.reduce((a,b) => a+b, 0) / excursions.length : sd * 1.5;
+
+  // Fasting glucose 6–10 AM
+  const fastingData = data.filter(d => { const h = d.datetime.getHours(); return h >= 6 && h < 10; });
+  const fastingAvg  = fastingData.length ? fastingData.reduce((a,b) => a + b.value, 0) / fastingData.length : null;
+
+  // Nocturnal glucose 0–4 AM
+  const noctData = data.filter(d => { const h = d.datetime.getHours(); return h >= 0 && h < 4; });
+  const noctAvg  = noctData.length ? noctData.reduce((a,b) => a + b.value, 0) / noctData.length : null;
+
+  // 5-tier TIR
+  const tbr2pct = (data.filter(d => d.value < 54).length / n * 100);
+  const tbr1pct = (data.filter(d => d.value >= 54 && d.value < 70).length / n * 100);
+  const tirpct  = (data.filter(d => d.value >= 70 && d.value <= 180).length / n * 100);
+  const tar1pct = (data.filter(d => d.value > 180 && d.value <= 250).length / n * 100);
+  const tar2pct = (data.filter(d => d.value > 250).length / n * 100);
+
+  // Update DOM
+  $('v1-r-gmi').textContent     = gmi.toFixed(1);
+  $('v1-r-gmi').style.color     = gmi >= 7 ? 'var(--red)' : gmi >= 5.7 ? 'var(--amber)' : 'var(--green)';
+  $('v1-r-cv').textContent      = cv.toFixed(1);
+  const cvBadge = $('v1-r-cv-badge');
+  cvBadge.style.display = 'inline-flex';
+  if (cv < 36)       { cvBadge.className = 'cv-badge cv-stable';   cvBadge.textContent = '✓ Stable (<36%)'; }
+  else if (cv < 50)  { cvBadge.className = 'cv-badge cv-moderate'; cvBadge.textContent = '⚠ Moderate'; }
+  else               { cvBadge.className = 'cv-badge cv-variable'; cvBadge.textContent = '✕ High variability'; }
+  $('v1-r-sd').textContent       = sd.toFixed(1);
+  $('v1-r-mage').textContent     = mage.toFixed(1);
+  $('v1-r-fasting').textContent  = fastingAvg !== null ? fastingAvg.toFixed(1) : '—';
+  $('v1-r-nocturnal').textContent = noctAvg !== null ? noctAvg.toFixed(1) : '—';
+
+  // 5-tier bars
+  $('v1-tir5-tbr2').style.width = tbr2pct.toFixed(2) + '%';
+  $('v1-tir5-tbr1').style.width = tbr1pct.toFixed(2) + '%';
+  $('v1-tir5-tir').style.width  = tirpct.toFixed(2)  + '%';
+  $('v1-tir5-tar1').style.width = tar1pct.toFixed(2) + '%';
+  $('v1-tir5-tar2').style.width = tar2pct.toFixed(2) + '%';
+
+  const setTgt = (id, val, target, isLow) => {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = val.toFixed(1);
+    el.className   = isLow ? (val <= target ? 'tir-target-met' : 'tir-target-miss')
+                            : (val >= target ? 'tir-target-met' : 'tir-target-warn');
+  };
+  setTgt('v1-r-tbr2-pct', tbr2pct, 1,  true);
+  setTgt('v1-r-tbr1-pct', tbr1pct, 4,  true);
+  setTgt('v1-r-tir-pct',  tirpct,  70, false);
+  setTgt('v1-r-tar1-pct', tar1pct, 25, true);
+  setTgt('v1-r-tar2-pct', tar2pct, 5,  true);
+
+  // Build research charts only when research panel is active
+  if ($('v1-view-research')?.classList.contains('active')) {
+    buildAGPChart(vid, data);
+    buildTimeBlockChart(vid, data);
+    buildTIRTrendChart(vid, data);
+  }
+  updateResearchTable(vid);
+}
+
+function buildAGPChart(vid, data) {
+  destroyChart(vid, 'agp');
+  if (!data.length) return;
+  const { tickColor, gridColor, monoFont } = chartDefaults(vid);
+
+  const hourBuckets = Array.from({length: 24}, () => []);
+  data.forEach(d => hourBuckets[d.datetime.getHours()].push(d.value));
+
+  function pct(arr, p) {
+    if (!arr.length) return null;
+    const sorted = [...arr].sort((a,b) => a-b);
+    const idx = (p / 100) * (sorted.length - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  }
+
+  const hours  = Array.from({length: 24}, (_, i) => `${i}:00`);
+  const median = hourBuckets.map(b => pct(b, 50));
+  const p75    = hourBuckets.map(b => pct(b, 75));
+  const p25    = hourBuckets.map(b => pct(b, 25));
+  const target180 = Array(24).fill(180);
+  const target70  = Array(24).fill(70);
+
+  const ctx = $(vid + '-agp-chart').getContext('2d');
+  STATE[vid].charts.agp = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [
+        { label: 'Target 180', data: target180, borderColor: 'rgba(5,150,105,0.5)', borderWidth: 1, borderDash: [5,4], pointRadius: 0, fill: '+1', backgroundColor: 'rgba(5,150,105,0.05)', tension: 0 },
+        { label: 'Target 70',  data: target70,  borderColor: 'rgba(5,150,105,0.5)', borderWidth: 1, borderDash: [5,4], pointRadius: 0, fill: false, tension: 0 },
+        { label: 'P75 (75th)', data: p75, borderColor: 'rgba(29,95,219,0.35)', backgroundColor: 'rgba(29,95,219,0.10)', fill: '+1', borderWidth: 1.5, borderDash: [3,3], pointRadius: 0, tension: 0.4 },
+        { label: 'P25 (25th)', data: p25, borderColor: 'rgba(29,95,219,0.35)', backgroundColor: 'transparent',         fill: false, borderWidth: 1.5, borderDash: [3,3], pointRadius: 0, tension: 0.4 },
+        { label: 'Median',     data: median, borderColor: '#1d5fdb', backgroundColor: 'transparent', fill: false, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#1d5fdb', tension: 0.4 },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            color: tickColor, font: { family: monoFont, size: 10 }, boxWidth: 10,
+            filter: item => ['Median','P75 (75th)','P25 (25th)'].includes(item.text)
+          }
+        },
+        tooltip: { callbacks: { label: c => c.parsed.y !== null ? `${c.dataset.label}: ${c.parsed.y.toFixed(1)} mg/dL` : '' } }
+      },
+      scales: {
+        x: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, maxRotation: 0 }, grid: { color: gridColor } },
+        y: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, callback: v => v + ' mg/dL' }, grid: { color: gridColor }, suggestedMin: 40, suggestedMax: 280 }
+      }
+    }
+  });
+}
+
+function buildTimeBlockChart(vid, data) {
+  destroyChart(vid, 'timeblock');
+  if (!data.length) return;
+  const { tickColor, gridColor, monoFont } = chartDefaults(vid);
+
+  const blocks = ['12–3 AM','3–6 AM','6–9 AM','9–12 PM','12–3 PM','3–6 PM','6–9 PM','9–12 AM'];
+  const starts = [0, 3, 6, 9, 12, 15, 18, 21];
+  const avgs = starts.map(h => {
+    const readings = data.filter(d => { const hr = d.datetime.getHours(); return hr >= h && hr < h + 3; });
+    return readings.length ? readings.reduce((a,b) => a + b.value, 0) / readings.length : null;
+  });
+  const colors = avgs.map(v => v === null ? 'rgba(122,143,171,0.3)' :
+    v < 70 ? 'rgba(220,38,38,0.7)' : v > 180 ? 'rgba(180,83,9,0.7)' : 'rgba(5,150,105,0.7)');
+
+  const ctx = $(vid + '-timeblock-chart').getContext('2d');
+  STATE[vid].charts.timeblock = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: blocks, datasets: [{ data: avgs, backgroundColor: colors, borderRadius: 4, borderSkipped: false }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y ? `${c.parsed.y.toFixed(1)} mg/dL` : 'No data' } } },
+      scales: {
+        x: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, maxRotation: 0 }, grid: { display: false } },
+        y: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, callback: v => v + ' mg/dL' }, grid: { color: gridColor }, suggestedMin: 60, suggestedMax: 220 }
+      }
+    }
+  });
+}
+
+function buildTIRTrendChart(vid, data) {
+  destroyChart(vid, 'tir-trend');
+  if (!data.length) return;
+  const { tickColor, gridColor, monoFont } = chartDefaults(vid);
+
+  const byDay = {};
+  data.forEach(d => { const k = toDate(d.datetime); if (!byDay[k]) byDay[k] = []; byDay[k].push(d.value); });
+  const days = Object.keys(byDay).sort();
+  const tirByDay = days.map(k => {
+    const vs = byDay[k];
+    return parseFloat((vs.filter(v => v >= 70 && v <= 180).length / vs.length * 100).toFixed(1));
+  });
+  const bgColors = tirByDay.map(v => v >= 70 ? 'rgba(5,150,105,0.15)' : v >= 50 ? 'rgba(180,83,9,0.15)' : 'rgba(220,38,38,0.15)');
+
+  const ctx = $(vid + '-tir-trend-chart').getContext('2d');
+  STATE[vid].charts['tir-trend'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: days.map(d => d.slice(5)), datasets: [
+      { label: 'TIR %', data: tirByDay, borderColor: '#059669', backgroundColor: bgColors, fill: true, pointRadius: 3, pointBackgroundColor: tirByDay.map(v => v >= 70 ? '#059669' : v >= 50 ? '#b45309' : '#dc2626'), borderWidth: 2, tension: 0.3 },
+      { label: 'Target 70%', data: Array(days.length).fill(70), borderColor: 'rgba(5,150,105,0.4)', borderWidth: 1, borderDash: [5,4], pointRadius: 0, fill: false, tension: 0 }
+    ]},
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.parsed.y}% TIR` } } },
+      scales: {
+        x: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, maxTicksLimit: 14, maxRotation: 45 }, grid: { display: false } },
+        y: { ticks: { color: tickColor, font: { family: monoFont, size: 9 }, callback: v => v + '%' }, grid: { color: gridColor }, min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+function updateResearchTable(vid) {
+  if (vid !== 'v1') return;
+  const st  = STATE[vid];
+  const tbody = $('v1-research-table-body');
+  if (!tbody || !st.users.length) return;
+
+  tbody.innerHTML = st.users.map(u => {
+    const vs  = u.data.map(d => d.value);
+    const n   = vs.length;
+    const avg = vs.reduce((a,b) => a+b, 0) / n;
+    const sd  = Math.sqrt(vs.map(v => (v-avg)**2).reduce((a,b) => a+b, 0) / n);
+    const cv  = (sd / avg * 100).toFixed(1);
+    const gmi = (3.31 + 0.02392 * avg).toFixed(1);
+    const tir = (vs.filter(v => v >= 70 && v <= 180).length / n * 100).toFixed(1);
+    const tbr = (vs.filter(v => v < 70).length / n * 100).toFixed(1);
+    const tar = (vs.filter(v => v > 180).length / n * 100).toFixed(1);
+    const fastRdgs = u.data.filter(d => { const h = d.datetime.getHours(); return h >= 6 && h < 10; });
+    const fastAvg  = fastRdgs.length ? (fastRdgs.reduce((a,b) => a + b.value, 0) / fastRdgs.length).toFixed(1) : '—';
+    const days = new Set(u.data.map(d => toDate(d.datetime))).size;
+    const isActive = u.id === st.activeId;
+
+    const tirColor  = parseFloat(tir) >= 70 ? 'var(--green)' : parseFloat(tir) >= 50 ? 'var(--amber)' : 'var(--red)';
+    const tbrColor  = parseFloat(tbr) <= 4  ? 'var(--green)' : 'var(--red)';
+    const tarColor  = parseFloat(tar) <= 25 ? 'var(--green)' : 'var(--amber)';
+    const gmiColor  = parseFloat(gmi) < 7   ? 'var(--green)' : 'var(--red)';
+
+    return `<tr style="${isActive ? 'background:var(--accent-bg)' : ''}">
+      <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${u.color};display:inline-block;flex-shrink:0"></span>${u.name}</span></td>
+      <td>${n.toLocaleString()}</td>
+      <td>${avg.toFixed(1)}</td>
+      <td style="color:${gmiColor};font-weight:600">${gmi}</td>
+      <td>${cv}</td>
+      <td>${sd.toFixed(1)}</td>
+      <td style="color:${tirColor};font-weight:600">${tir}</td>
+      <td style="color:${tbrColor};font-weight:600">${tbr}</td>
+      <td style="color:${tarColor};font-weight:600">${tar}</td>
+      <td>${fastAvg}</td>
+      <td>${days}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportResearchCSV(vid) {
+  const st = STATE[vid];
+  if (!st.users.length) return alert('No data loaded.');
+  const headers = ['Subject','Readings','Avg_mgdL','GMI_pct','CV_pct','SD_mgdL','TIR_pct','TBR_pct','TAR_pct','Fasting_Avg_mgdL','Days'];
+  const rows = st.users.map(u => {
+    const vs  = u.data.map(d => d.value);
+    const n   = vs.length;
+    const avg = vs.reduce((a,b) => a+b, 0) / n;
+    const sd  = Math.sqrt(vs.map(v => (v-avg)**2).reduce((a,b) => a+b, 0) / n);
+    const cv  = (sd / avg * 100).toFixed(1);
+    const gmi = (3.31 + 0.02392 * avg).toFixed(1);
+    const tir = (vs.filter(v => v >= 70 && v <= 180).length / n * 100).toFixed(1);
+    const tbr = (vs.filter(v => v < 70).length / n * 100).toFixed(1);
+    const tar = (vs.filter(v => v > 180).length / n * 100).toFixed(1);
+    const fastRdgs = u.data.filter(d => { const h = d.datetime.getHours(); return h >= 6 && h < 10; });
+    const fastAvg  = fastRdgs.length ? (fastRdgs.reduce((a,b) => a + b.value, 0) / fastRdgs.length).toFixed(1) : '';
+    const days = new Set(u.data.map(d => toDate(d.datetime))).size;
+    return [u.name, n, avg.toFixed(1), gmi, cv, sd.toFixed(1), tir, tbr, tar, fastAvg, days].join(',');
+  });
+  const csv  = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'lingocgm_research_summary.csv'; a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── CHARTS ───────────────────────────────────
@@ -2322,8 +2863,8 @@ function rebuildLineChart(vid) {
   let datasets = [];
 
   if (overlay && st.users.length > 1) {
-    // All users
-    st.users.forEach((user, i) => {
+    // All visible users (respect hidden toggle)
+    st.users.filter(u => !u.hidden).forEach((user) => {
       const data = user.data;
       datasets.push({
         label: user.name,
@@ -2416,15 +2957,22 @@ function resetZoom(vid) { STATE[vid].charts.line?.resetZoom(); }
 function buildComparePills(vid) {
   const st = STATE[vid];
   if (st.users.length < 2) { $(vid+'-compare-pills').innerHTML = ''; return; }
-  const makeHTML = u => `<div class="compare-pill" style="background:transparent;border-color:${u.color};color:${u.color}" onclick="toggleOverlay('${vid}','${u.id}',this)"><div class="compare-pill-dot" style="background:${u.color}"></div>${u.name}</div>`;
+  const makeHTML = u => `<div class="compare-pill ${u.hidden ? 'hidden' : ''}" data-uid="${u.id}" style="background:transparent;border-color:${u.color};color:${u.color}" onclick="toggleOverlay('${vid}','${u.id}',this)" title="Click to toggle ${u.name}"><div class="compare-pill-dot" style="background:${u.color}"></div>${u.name}</div>`;
   $(vid + '-compare-pills').innerHTML = st.users.map(makeHTML).join('');
   const el2 = $(vid + '-cmp-pills');
   if (el2) el2.innerHTML = st.users.map(makeHTML).join('');
 }
 
 function toggleOverlay(vid, userId, pill) {
-  pill.classList.toggle('hidden');
+  const user = STATE[vid].users.find(u => u.id === userId);
+  if (!user) return;
+  user.hidden = !user.hidden;
+  // Sync all pills for this user across both pill containers
+  document.querySelectorAll(`[data-uid="${userId}"]`).forEach(p => {
+    user.hidden ? p.classList.add('hidden') : p.classList.remove('hidden');
+  });
   rebuildLineChart(vid);
+  if (STATE[vid].users.length > 1) buildCompareOverlay(vid);
 }
 
 // ─── WEEKLY VIEW ──────────────────────────────
@@ -2514,7 +3062,7 @@ function buildCompareOverlay(vid) {
   const now = new Date();
   const cutoff = range==='7d' ? new Date(now-604800000) : range==='30d' ? new Date(now-2592000000) : null;
 
-  const datasets = st.users.map(u => {
+  const datasets = st.users.filter(u => !u.hidden).map(u => {
     const data = cutoff ? u.data.filter(d=>d.datetime>=cutoff) : u.data;
     return { label:u.name, data:data.map(d=>({x:d.datetime,y:d.value})), borderColor:u.color, borderWidth:1.5, pointRadius:0, tension:0.3, fill:false };
   });
@@ -2534,12 +3082,13 @@ function buildCompareTIR(vid) {
   const dark = vid === 'v2';
   const { tickColor, gridColor, monoFont } = chartDefaults(vid);
 
-  const labels = st.users.map(u => u.name);
-  const tirVals = st.users.map(u => { const vs=u.data.map(d=>d.value); return (vs.filter(v=>v>=70&&v<=180).length/vs.length*100).toFixed(1); });
+  const visibleUsers = st.users.filter(u => !u.hidden);
+  const labels = visibleUsers.map(u => u.name);
+  const tirVals = visibleUsers.map(u => { const vs=u.data.map(d=>d.value); return (vs.filter(v=>v>=70&&v<=180).length/vs.length*100).toFixed(1); });
 
   const ctx = $(vid + '-cmp-tir-chart').getContext('2d');
   STATE[vid].charts['cmp-tir'] = new Chart(ctx, {
-    type:'bar', data:{ labels, datasets:[{ data:tirVals, backgroundColor:st.users.map(u=>u.color+'cc'), borderRadius:4 }] },
+    type:'bar', data:{ labels, datasets:[{ data:tirVals, backgroundColor:visibleUsers.map(u=>u.color+'cc'), borderRadius:4 }] },
     options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:tickColor,font:{family:monoFont,size:10}},grid:{display:false}}, y:{ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>v+'%'},grid:{color:gridColor},min:0,max:100} } }
   });
 }
@@ -2551,12 +3100,13 @@ function buildCompareAvg(vid) {
   const dark = vid === 'v2';
   const { tickColor, gridColor, monoFont } = chartDefaults(vid);
 
-  const labels = st.users.map(u => u.name);
-  const avgVals = st.users.map(u => { const vs=u.data.map(d=>d.value); return (vs.reduce((a,b)=>a+b,0)/vs.length).toFixed(1); });
+  const visibleUsersAvg = st.users.filter(u => !u.hidden);
+  const labels = visibleUsersAvg.map(u => u.name);
+  const avgVals = visibleUsersAvg.map(u => { const vs=u.data.map(d=>d.value); return (vs.reduce((a,b)=>a+b,0)/vs.length).toFixed(1); });
 
   const ctx = $(vid + '-cmp-avg-chart').getContext('2d');
   STATE[vid].charts['cmp-avg'] = new Chart(ctx, {
-    type:'bar', data:{ labels, datasets:[{ data:avgVals, backgroundColor:st.users.map(u=>u.color+'cc'), borderRadius:4 }] },
+    type:'bar', data:{ labels, datasets:[{ data:avgVals, backgroundColor:visibleUsersAvg.map(u=>u.color+'cc'), borderRadius:4 }] },
     options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:tickColor,font:{family:monoFont,size:10}},grid:{display:false}}, y:{ticks:{color:tickColor,font:{family:monoFont,size:9},callback:v=>v+' mg/dL'},grid:{color:gridColor},suggestedMin:60,suggestedMax:200} } }
   });
 }
