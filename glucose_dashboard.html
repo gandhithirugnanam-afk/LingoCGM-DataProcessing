@@ -664,6 +664,50 @@ tr.row-low:hover td { background: rgba(239,68,68,0.12); }
 
 .preview-row { padding: 2px 0; }
 .preview-row:first-child { color: var(--accent2); font-weight: 500; }
+
+/* ── VALIDATION ── */
+.validation-panel {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 560px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.validation-banner {
+  display: none;
+  position: relative;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 40px 12px 16px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.v-row { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+.v-ok   { color: var(--green); }
+.v-warn { color: var(--orange); }
+.v-error{ color: var(--red); }
+.v-muted{ color: var(--muted); }
+
+.v-close {
+  position: absolute;
+  top: 10px; right: 12px;
+  background: none; border: none;
+  color: var(--muted); cursor: pointer;
+  font-size: 13px; line-height: 1;
+}
+.v-close:hover { color: var(--text); }
 </style>
 </head>
 <body data-theme="dark">
@@ -701,6 +745,7 @@ tr.row-low:hover td { background: rgba(239,68,68,0.12); }
   </div>
 
   <div class="preview-strip" id="preview-strip"></div>
+  <div class="validation-panel" id="validation-panel"></div>
 
   <div class="upload-hint">
     <strong>Expected CSV columns:</strong><br>
@@ -713,6 +758,9 @@ tr.row-low:hover td { background: rgba(239,68,68,0.12); }
 <!-- Dashboard -->
 <div id="dashboard">
 <main>
+
+  <!-- Validation Banner -->
+  <div class="validation-banner" id="validation-banner"></div>
 
   <!-- Alert Banner -->
   <div class="alert-banner" id="alert-banner">
@@ -931,49 +979,103 @@ function handleFiles(files) {
 }
 
 function handleFile(file) {
-  if (!file || !file.name.endsWith('.csv')) {
-    alert('Please upload .csv files only.');
+  const panel = document.getElementById('validation-panel');
+  panel.style.display = 'none';
+
+  // File-level checks
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    showUploadError([`✗ "${file.name}" is not a CSV file. Only .csv files are accepted.`]);
     return;
   }
+  if (file.size === 0) {
+    showUploadError([`✗ "${file.name}" is empty.`]);
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    showUploadError([`✗ "${file.name}" exceeds the 20 MB limit (${(file.size / 1048576).toFixed(1)} MB).`]);
+    return;
+  }
+
   showLoading(true);
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: function(results) {
       showLoading(false);
+      if (!results.data.length) {
+        showUploadError([`✗ "${file.name}" parsed to zero rows — the file may have no data rows.`]);
+        return;
+      }
       processData(results.data, file.name);
     },
     error: function(err) {
       showLoading(false);
-      alert('Error parsing CSV: ' + err.message);
+      showUploadError([`✗ CSV parse error in "${file.name}": ${err.message}`]);
     }
   });
 }
 
 function processData(rows, fileName) {
   const parsed = [];
+  const skipped = { outOfRange: 0, nonPhysiological: 0, badNumber: 0, badDate: 0 };
+  let detectionMethod = 'keyword';
 
-  // Detect column names flexibly
-  const sampleRow = rows[0] || {};
-  const keys = Object.keys(sampleRow);
-  const timeKey = keys.find(k => k.toLowerCase().includes('time') || k.toLowerCase().includes('date')) || keys[0];
-  const valKey  = keys.find(k => k.toLowerCase().includes('measure') || k.toLowerCase().includes('mg') || k.toLowerCase().includes('glucose')) || keys[1];
+  // Detect columns: keyword match → plausibility scan → positional fallback
+  const keys = Object.keys(rows[0] || {});
 
-  // Show preview for most-recently-added user
+  let timeKey = keys.find(k => k.toLowerCase().includes('time') || k.toLowerCase().includes('date'));
+  let valKey  = keys.find(k =>
+    k !== timeKey &&
+    (k.toLowerCase().includes('measure') || k.toLowerCase().includes('mg') || k.toLowerCase().includes('glucose'))
+  );
+
+  if (!valKey) {
+    detectionMethod = 'plausibility';
+    const sample = rows.slice(0, 20);
+    for (const key of keys) {
+      if (key === timeKey) continue;
+      const nums = sample.map(r => parseFloat(r[key])).filter(n => !isNaN(n));
+      if (nums.length > 0 && nums.every(n => n >= 30 && n <= 700)) { valKey = key; break; }
+    }
+  }
+
+  if (!timeKey || !valKey) detectionMethod = 'fallback';
+  if (!timeKey) timeKey = keys[0];
+  if (!valKey)  valKey  = keys.find(k => k !== timeKey) || keys[1];
+
   showPreview(rows.slice(0, 5), timeKey, valKey);
 
   rows.forEach(row => {
-    const rawVal = row[valKey];
-    if (!rawVal || rawVal.toString().toLowerCase().includes('out of range') || rawVal.toString().toLowerCase() === 'low' || rawVal.toString().toLowerCase() === 'high') return;
+    const rawVal = (row[valKey] || '').toString().trim();
+    if (!rawVal) { skipped.badNumber++; return; }
+    const lower = rawVal.toLowerCase();
+    if (lower.includes('out of range') || lower === 'low' || lower === 'high') { skipped.outOfRange++; return; }
     const num = parseFloat(rawVal);
-    if (isNaN(num)) return;
+    if (isNaN(num)) { skipped.badNumber++; return; }
+    if (num < 20 || num > 700) { skipped.nonPhysiological++; return; }
     const dt = new Date(row[timeKey]);
-    if (isNaN(dt.getTime())) return;
+    if (isNaN(dt.getTime())) { skipped.badDate++; return; }
     parsed.push({ datetime: dt, value: num });
   });
 
+  const totalSkipped = skipped.outOfRange + skipped.nonPhysiological + skipped.badNumber + skipped.badDate;
+
   if (parsed.length === 0) {
-    alert(`No valid readings found in "${fileName}". Check column names match expected format.`);
+    showUploadError([
+      `✗ No valid glucose readings found in "${fileName}".`,
+      `  Detected columns → time: "${timeKey}" · glucose: "${valKey}" (${detectionMethod})`,
+      `  ${rows.length} rows checked — ${skipped.outOfRange} out-of-range, ${skipped.badDate} bad dates, ${skipped.badNumber} non-numeric, ${skipped.nonPhysiological} non-physiological.`,
+      `  Verify your CSV column names match the expected format below.`,
+    ]);
+    return;
+  }
+
+  if (parsed.length < 5) {
+    showUploadError([
+      `✗ Only ${parsed.length} valid reading${parsed.length !== 1 ? 's' : ''} found in "${fileName}" — too few to display.`,
+      `  At least 5 readings are required.`,
+    ]);
     return;
   }
 
@@ -1003,6 +1105,47 @@ function processData(rows, fileName) {
   }
 
   setActiveUser(id);
+  showValidationBanner({ fileName, timeKey, valKey, detectionMethod, total: rows.length, valid: parsed.length, skipped, totalSkipped });
+}
+
+function showUploadError(lines) {
+  const panel = document.getElementById('validation-panel');
+  panel.style.display = 'flex';
+  panel.innerHTML = lines.map((l, i) =>
+    `<div class="v-row ${i === 0 ? 'v-error' : 'v-muted'}">${l}</div>`
+  ).join('');
+}
+
+function showValidationBanner({ fileName, timeKey, valKey, detectionMethod, total, valid, skipped, totalSkipped }) {
+  const banner = document.getElementById('validation-banner');
+  const rows = [];
+
+  rows.push(`<div class="v-row v-ok">✓ ${valid.toLocaleString()} valid readings loaded from "${fileName}"</div>`);
+
+  const methodLabel = detectionMethod === 'keyword'
+    ? `<span class="v-ok">✓ keyword match</span>`
+    : detectionMethod === 'plausibility'
+      ? `<span class="v-warn">⚠ auto-detected (no keyword match)</span>`
+      : `<span class="v-warn">⚠ positional fallback — column names not recognised</span>`;
+  rows.push(`<div class="v-row v-muted">Columns → time: "${timeKey}" · glucose: "${valKey}" · ${methodLabel}</div>`);
+
+  if (totalSkipped > 0) {
+    const reasons = [];
+    if (skipped.outOfRange)       reasons.push(`${skipped.outOfRange} device out-of-range`);
+    if (skipped.badDate)          reasons.push(`${skipped.badDate} unparseable date`);
+    if (skipped.badNumber)        reasons.push(`${skipped.badNumber} non-numeric value`);
+    if (skipped.nonPhysiological) reasons.push(`${skipped.nonPhysiological} outside 20–700 mg/dL`);
+    const pct = (totalSkipped / total * 100).toFixed(0);
+    rows.push(`<div class="v-row v-warn">⚠ ${totalSkipped} of ${total} rows skipped (${pct}%): ${reasons.join(' · ')}</div>`);
+  }
+
+  banner.innerHTML = rows.join('') + `<button class="v-close" onclick="this.parentElement.style.display='none'">✕</button>`;
+  banner.style.display = 'flex';
+
+  if (totalSkipped === 0 && detectionMethod === 'keyword') {
+    clearTimeout(banner._timer);
+    banner._timer = setTimeout(() => { banner.style.display = 'none'; }, 6000);
+  }
 }
 
 function readFiltersFromUI() {
@@ -1535,6 +1678,8 @@ function resetDashboard() {
   document.getElementById('export-csv-btn').style.display = 'none';
   document.getElementById('export-excel-btn').style.display = 'none';
   document.getElementById('preview-strip').style.display = 'none';
+  document.getElementById('validation-panel').style.display = 'none';
+  document.getElementById('validation-banner').style.display = 'none';
   document.getElementById('csv-input').value = '';
   if (lineChart)   { lineChart.destroy();   lineChart   = null; }
   if (hourlyChart) { hourlyChart.destroy(); hourlyChart = null; }
