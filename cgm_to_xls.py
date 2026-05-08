@@ -18,7 +18,7 @@ Output sheets
   1. Raw Data       – cleaned & sorted input readings
   2. Summary        – key scalar metrics (avg, SD, CV, GMI, eA1c, MAGE, TIR tiers,
                       fasting avg, nocturnal avg, best/worst days)
-  3. Daily          – per-day: reading count, avg glucose, TIR%, TBR%, TAR%
+  3. Daily          – per-day: reading count, avg glucose, TIR%, TBR%, TAR%, AUC
   4. AGP            – hourly 10th/25th/median/75th/90th percentiles
   5. Time Blocks    – 3-hour window averages (8 windows)
 """
@@ -269,6 +269,10 @@ def calc_summary(readings: list[dict]) -> dict:
     min_r = next(r for r in readings if r["value"] == mn)
     max_r = next(r for r in readings if r["value"] == mx)
 
+    # AUC above 70 mg/dL (trapezoidal rule, mirrors dashboard JS)
+    total_auc = calc_auc(readings)
+    mean_daily_auc = total_auc / n_days if n_days else 0.0
+
     return dict(
         n=n, avg=avg, mn=mn, mx=mx, sd=sd, cv=cv,
         gmi=gmi, ea1c=ea1c, mage=mage,
@@ -279,22 +283,25 @@ def calc_summary(readings: list[dict]) -> dict:
         trend=trend, n_days=n_days,
         min_dt=min_r["datetime"], max_dt=max_r["datetime"],
         date_start=min(days_set), date_end=max(days_set),
+        total_auc=total_auc, mean_daily_auc=mean_daily_auc,
     )
 
 
 def calc_daily(readings: list[dict]) -> list[dict]:
-    by_day: dict[date, list[float]] = defaultdict(list)
+    by_day: dict[date, list[dict]] = defaultdict(list)
     for r in readings:
-        by_day[r["datetime"].date()].append(r["value"])
+        by_day[r["datetime"].date()].append(r)
     rows = []
     for d in sorted(by_day):
-        vs = by_day[d]
+        day_readings = by_day[d]
+        vs = [r["value"] for r in day_readings]
         n = len(vs)
         avg = sum(vs) / n
         tir = sum(1 for v in vs if 70 <= v <= 180) / n * 100
         tbr = sum(1 for v in vs if v < 70)  / n * 100
         tar = sum(1 for v in vs if v > 180) / n * 100
-        rows.append(dict(date=d, n=n, avg=avg, tir=tir, tbr=tbr, tar=tar))
+        day_auc = calc_auc(day_readings)
+        rows.append(dict(date=d, n=n, avg=avg, tir=tir, tbr=tbr, tar=tar, auc=day_auc))
     return rows
 
 
@@ -316,6 +323,22 @@ def calc_agp(readings: list[dict]) -> list[dict]:
             p90=_percentile(vs, 90) if vs else None,
         ))
     return rows
+
+
+def calc_auc(readings: list[dict], baseline: float = 70.0) -> float:
+    """Trapezoidal AUC above baseline (mg/dL·h). Mirrors dashboard JS auc()."""
+    pts = sorted(readings, key=lambda r: r["datetime"])
+    if len(pts) < 2:
+        return 0.0
+    total = 0.0
+    for i in range(1, len(pts)):
+        dt_h = (pts[i]["datetime"] - pts[i - 1]["datetime"]).total_seconds() / 3600.0
+        if dt_h > 1.0:
+            continue  # skip gaps larger than 1 h (sensor dropout)
+        h1 = max(0.0, pts[i - 1]["value"] - baseline)
+        h2 = max(0.0, pts[i]["value"]     - baseline)
+        total += (h1 + h2) / 2.0 * dt_h
+    return total
 
 
 def calc_time_blocks(readings: list[dict]) -> list[dict]:
@@ -466,6 +489,14 @@ def build_summary_sheet(wb: openpyxl.Workbook, s: dict, subject_name: str):
                f"(avg + 46.7) / 28.7  —  {ea1c_note}",
                color=ea1c_color, bold_val=True); row += 2
 
+    # ── AUC ───────────────────────────────────────────────────────────────────
+    section(row, "GLYCEMIC EXPOSURE — AREA UNDER THE CURVE (AUC > 70 mg/dL)"); row += 1
+    row_metric(row, "Total AUC (all readings)", round(s["total_auc"], 1), "mg/dL·h",
+               "Trapezoidal rule above 70 mg/dL baseline — Σ [(G₁−70 + G₂−70)/2] × Δt",
+               bold_val=True); row += 1
+    row_metric(row, "Mean Daily AUC", round(s["mean_daily_auc"], 1), "mg/dL·h/day",
+               "Total AUC ÷ number of days  —  lower is better"); row += 2
+
     # ── 5-TIER TIR ────────────────────────────────────────────────────────────
     section(row, "5-TIER TIME IN RANGE (ADA/EASD Consensus Targets — T2D)"); row += 1
 
@@ -518,8 +549,8 @@ def build_daily_sheet(wb: openpyxl.Workbook, daily: list[dict]):
     ws.sheet_view.showGridLines = False
     ws.freeze_panes = "A2"
 
-    headers = ["Date", "Readings", "Avg Glucose (mg/dL)", "TIR % (70–180)", "TBR % (<70)", "TAR % (>180)", "Status"]
-    widths   = [14,       10,          22,                   18,               16,             16,              14]
+    headers = ["Date", "Readings", "Avg Glucose (mg/dL)", "TIR % (70–180)", "TBR % (<70)", "TAR % (>180)", "AUC (mg/dL·h)", "Status"]
+    widths   = [14,       10,          22,                   18,               16,             16,              16,               14]
     for col, (h, w) in enumerate(zip(headers, widths), 1):
         _header_cell(ws, 1, col, h)
         _set_col_width(ws, col, w)
@@ -532,13 +563,14 @@ def build_daily_sheet(wb: openpyxl.Workbook, daily: list[dict]):
                     "Low glucose" if d["tbr"] > 4 else "High glucose")
         status_color = C_GREEN if status == "Good" else C_RED if "Low" in status else C_AMBER
 
-        _data_cell(ws, i, 1, d["date"],          num_fmt="YYYY-MM-DD", align="center")
-        _data_cell(ws, i, 2, d["n"],              align="center")
-        _data_cell(ws, i, 3, round(d["avg"], 1),  num_fmt="0.0", align="center")
-        _data_cell(ws, i, 4, round(d["tir"], 1),  num_fmt="0.0", color=tir_color, bold=True)
-        _data_cell(ws, i, 5, round(d["tbr"], 1),  num_fmt="0.0", color=tbr_color, bold=True)
-        _data_cell(ws, i, 6, round(d["tar"], 1),  num_fmt="0.0", color=tar_color, bold=True)
-        _data_cell(ws, i, 7, status, color=status_color, bold=True)
+        _data_cell(ws, i, 1, d["date"],           num_fmt="YYYY-MM-DD", align="center")
+        _data_cell(ws, i, 2, d["n"],               align="center")
+        _data_cell(ws, i, 3, round(d["avg"], 1),   num_fmt="0.0", align="center")
+        _data_cell(ws, i, 4, round(d["tir"], 1),   num_fmt="0.0", color=tir_color, bold=True)
+        _data_cell(ws, i, 5, round(d["tbr"], 1),   num_fmt="0.0", color=tbr_color, bold=True)
+        _data_cell(ws, i, 6, round(d["tar"], 1),   num_fmt="0.0", color=tar_color, bold=True)
+        _data_cell(ws, i, 7, round(d["auc"], 1),   num_fmt="0.0", align="center")
+        _data_cell(ws, i, 8, status, color=status_color, bold=True)
 
     ws.row_dimensions[1].height = 24
 
@@ -677,6 +709,7 @@ def _print_summary(s: dict, name: str):
     print(f"  Avg      : {s['avg']:.1f} mg/dL  (SD: {s['sd']:.1f}, CV: {s['cv']:.1f}%)")
     print(f"  GMI      : {s['gmi']:.2f}%  |  eA1c: {s['ea1c']:.2f}%")
     print(f"  MAGE     : {s['mage']:.1f} mg/dL")
+    print(f"  AUC>70   : {s['total_auc']:.1f} mg/dL·h total  |  {s['mean_daily_auc']:.1f} mg/dL·h/day avg")
     print(f"  TIR      : {s['tir']:.1f}%  (TBR {s['tbr']:.1f}%  /  TAR {s['tar']:.1f}%)")
     print(f"  5-tier   : TBR2 {s['tbr2']:.1f}%  TBR1 {s['tbr1']:.1f}%  TIR {s['tir']:.1f}%"
           f"  TAR1 {s['tar1']:.1f}%  TAR2 {s['tar2']:.1f}%")
