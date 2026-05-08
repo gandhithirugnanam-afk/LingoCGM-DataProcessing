@@ -16,8 +16,8 @@ Input CSV columns (auto-detected, case-insensitive):
 Output sheets
 -------------
   1. Raw Data       – cleaned & sorted input readings
-  2. Summary        – key scalar metrics (avg, SD, CV, GMI, eA1c, MAGE, TIR tiers,
-                      fasting avg, nocturnal avg, best/worst days)
+  2. Summary        – key scalar metrics (avg, SD, CV, GMI, eA1c, MAGE, AUC >70 mg/dL,
+                      TIR tiers, fasting avg, nocturnal avg, best/worst days)
   3. Daily          – per-day: reading count, avg glucose, TIR%, TBR%, TAR%, AUC
   4. AGP            – hourly 10th/25th/median/75th/90th percentiles
   5. Time Blocks    – 3-hour window averages (8 windows)
