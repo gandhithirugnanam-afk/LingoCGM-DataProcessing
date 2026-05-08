@@ -17,10 +17,12 @@ Output sheets
 -------------
   1. Raw Data       – cleaned & sorted input readings
   2. Summary        – key scalar metrics (avg, SD, CV, GMI, eA1c, MAGE, TIR tiers,
-                      fasting avg, nocturnal avg, best/worst days)
-  3. Daily          – per-day: reading count, avg glucose, TIR%, TBR%, TAR%
-  4. AGP            – hourly 10th/25th/median/75th/90th percentiles
-  5. Time Blocks    – 3-hour window averages (8 windows)
+                      fasting avg, nocturnal avg, AUC summary)
+  3. AUC            – trapezoidal AUC: total / hyper (>180) / hypo (<70), daily-normalised
+                      rates, and per-hour breakdown showing where burden concentrates
+  4. Daily          – per-day: reading count, avg glucose, TIR%, TBR%, TAR%
+  5. AGP            – hourly 10th/25th/median/75th/90th percentiles
+  6. Time Blocks    – 3-hour window averages (8 windows)
 """
 
 from __future__ import annotations
@@ -58,6 +60,9 @@ C_TBR1 = "DC2626"   # low 54–69
 C_TIR  = "059669"   # in-range 70–180
 C_TAR1 = "B45309"   # high 181–250
 C_TAR2 = "78350F"   # very high >250
+
+# Intervals longer than this (hours) are excluded from all AUC calculations
+AUC_GAP_THRESHOLD_HR = 1.0
 
 
 # ─── Style helpers ────────────────────────────────────────────────────────────
@@ -338,6 +343,61 @@ def calc_time_blocks(readings: list[dict]) -> list[dict]:
     return rows
 
 
+def calc_auc(readings: list[dict]) -> dict:
+    """
+    Trapezoidal AUC metrics.  For each consecutive pair of readings separated
+    by ≤ AUC_GAP_THRESHOLD_HR hours the contribution is:
+        area = (g1 + g2) / 2 × Δt_hours
+    Hyper/hypo variants use max(0, g − threshold) before averaging.
+    """
+    total_auc = hyper_auc = hypo_auc = valid_hours = 0.0
+
+    for i in range(1, len(readings)):
+        dt_hr = (readings[i]["datetime"] - readings[i-1]["datetime"]).total_seconds() / 3600
+        if dt_hr > AUC_GAP_THRESHOLD_HR:
+            continue
+        g1, g2 = readings[i-1]["value"], readings[i]["value"]
+        total_auc  += (g1 + g2) / 2 * dt_hr
+        hyper_auc  += (max(0.0, g1 - 180) + max(0.0, g2 - 180)) / 2 * dt_hr
+        hypo_auc   += (max(0.0, 70 - g1)  + max(0.0, 70 - g2))  / 2 * dt_hr
+        valid_hours += dt_hr
+
+    n_days = len({r["datetime"].date() for r in readings})
+    return dict(
+        total_auc=total_auc,
+        hyper_auc=hyper_auc,
+        hypo_auc=hypo_auc,
+        daily_total=total_auc / n_days if n_days else 0.0,
+        daily_hyper=hyper_auc / n_days if n_days else 0.0,
+        daily_hypo=hypo_auc  / n_days if n_days else 0.0,
+        valid_hours=valid_hours,
+        n_days=n_days,
+    )
+
+
+def calc_auc_hourly(readings: list[dict]) -> list[dict]:
+    """Per-hour trapezoidal AUC breakdown (interval assigned to the later reading's hour)."""
+    buckets: dict[int, dict] = {
+        h: {"total": 0.0, "hyper": 0.0, "hypo": 0.0, "intervals": 0}
+        for h in range(24)
+    }
+    for i in range(1, len(readings)):
+        dt_hr = (readings[i]["datetime"] - readings[i-1]["datetime"]).total_seconds() / 3600
+        if dt_hr > AUC_GAP_THRESHOLD_HR:
+            continue
+        g1, g2 = readings[i-1]["value"], readings[i]["value"]
+        h = readings[i]["datetime"].hour
+        buckets[h]["total"]     += (g1 + g2) / 2 * dt_hr
+        buckets[h]["hyper"]     += (max(0.0, g1 - 180) + max(0.0, g2 - 180)) / 2 * dt_hr
+        buckets[h]["hypo"]      += (max(0.0, 70 - g1)  + max(0.0, 70 - g2))  / 2 * dt_hr
+        buckets[h]["intervals"] += 1
+
+    return [
+        dict(hour=h, label=f"{h:02d}:00", **buckets[h])
+        for h in range(24)
+    ]
+
+
 # ─── Sheet builders ───────────────────────────────────────────────────────────
 
 def _set_col_width(ws, col: int, width: float):
@@ -369,7 +429,7 @@ def build_raw_sheet(wb: openpyxl.Workbook, readings: list[dict]):
     ws.row_dimensions[1].height = 24
 
 
-def build_summary_sheet(wb: openpyxl.Workbook, s: dict, subject_name: str):
+def build_summary_sheet(wb: openpyxl.Workbook, s: dict, auc: dict, subject_name: str):
     ws = wb.create_sheet("Summary")
     ws.sheet_view.showGridLines = False
 
@@ -507,6 +567,32 @@ def build_summary_sheet(wb: openpyxl.Workbook, s: dict, subject_name: str):
         display = round(val, 1) if val is not None else "—"
         note = "mg/dL" if val is not None else "No readings in this window"
         row_metric(row, label, display, "mg/dL" if val is not None else "", note); row += 1
+    row += 1
+
+    # ── AREA UNDER THE CURVE ──────────────────────────────────────────────────
+    section(row, "AREA UNDER THE CURVE  (Trapezoidal — gaps >1 hr excluded)"); row += 1
+    row_metric(row, "Total AUC",
+               round(auc["total_auc"], 1), "mg/dL·hr",
+               f"Glucose-time integral over {auc['valid_hours']:.1f} valid hours "
+               f"({auc['n_days']} days)"); row += 1
+    row_metric(row, "Hyperglycemic AUC  (>180 mg/dL)",
+               round(auc["hyper_auc"], 1), "mg/dL·hr",
+               "Time-weighted exposure above 180. Captures frequency AND depth of hyperglycaemia.",
+               color=C_AMBER if auc["hyper_auc"] > 0 else C_GREEN,
+               bold_val=auc["hyper_auc"] > 0); row += 1
+    row_metric(row, "Hypoglycemic AUC  (<70 mg/dL)",
+               round(auc["hypo_auc"], 1), "mg/dL·hr",
+               "Time-weighted deficit below 70. Reflects hypo severity, not just event count.",
+               color=C_RED if auc["hypo_auc"] > 0 else C_GREEN,
+               bold_val=auc["hypo_auc"] > 0); row += 1
+    row_metric(row, "Daily Hyper AUC  (normalised)",
+               round(auc["daily_hyper"], 2), "mg/dL·hr/day",
+               "Hyperglycemic AUC ÷ days. Use this for comparing datasets of different lengths.",
+               color=C_AMBER if auc["daily_hyper"] > 0 else C_GREEN); row += 1
+    row_metric(row, "Daily Hypo AUC  (normalised)",
+               round(auc["daily_hypo"], 2), "mg/dL·hr/day",
+               "Hypoglycemic AUC ÷ days.",
+               color=C_RED if auc["daily_hypo"] > 0 else C_GREEN); row += 1
 
     ws.row_dimensions[1].height = 28
     ws.row_dimensions[2].height = 20
@@ -640,6 +726,99 @@ def build_timeblock_sheet(wb: openpyxl.Workbook, blocks: list[dict]):
         rc.border = _border_thin()
 
 
+def build_auc_sheet(wb: openpyxl.Workbook, auc: dict, auc_hourly: list[dict]):
+    ws = wb.create_sheet("AUC")
+    ws.sheet_view.showGridLines = False
+
+    # ── Title ────────────────────────────────────────────────────────────────
+    ws.row_dimensions[1].height = 32
+    t = ws.cell(row=1, column=1, value="Area Under the Glucose-Time Curve (AUC)")
+    t.font = _font(bold=True, size=14, color=C_ACCENT); t.alignment = _left()
+    ws.merge_cells("A1:F1")
+
+    ws.row_dimensions[2].height = 16
+    s2 = ws.cell(row=2, column=1,
+                 value=f"Trapezoidal method. Sensor gaps >1 hour excluded. "
+                       f"Coverage: {auc['valid_hours']:.1f} hrs over {auc['n_days']} days.")
+    s2.font = _font(size=9, color=C_MUTED, italic=True); s2.alignment = _left()
+    ws.merge_cells("A2:F2")
+
+    # ── Summary metrics table ─────────────────────────────────────────────────
+    ws.row_dimensions[4].height = 22
+    for col, hdr in enumerate(["Metric", "Total", "Per Day (normalised)", "Unit", "Notes"], 1):
+        _header_cell(ws, 4, col, hdr, bg=C_ACCENT if col != 3 else C_PURPLE)
+
+    summary_rows = [
+        ("Total AUC",
+         auc["total_auc"], auc["daily_total"], "mg/dL·hr",
+         "Full glucose-time integral", C_ACCENT),
+        ("Hyperglycemic AUC  (>180 mg/dL)",
+         auc["hyper_auc"], auc["daily_hyper"], "mg/dL·hr",
+         "Exposure above 180 — frequency × depth combined", C_TAR1),
+        ("Hypoglycemic AUC  (<70 mg/dL)",
+         auc["hypo_auc"],  auc["daily_hypo"],  "mg/dL·hr",
+         "Deficit below 70 — severity of hypos", C_TBR1),
+    ]
+    for i, (label, total, daily, unit, note, clr) in enumerate(summary_rows, 5):
+        ws.row_dimensions[i].height = 20
+        lc = ws.cell(row=i, column=1, value=label)
+        lc.font = _font(color=C_TEXT2, bold=True); lc.alignment = _left(); lc.border = _border_thin()
+        _data_cell(ws, i, 2, round(total, 1),  num_fmt="0.0", bold=True, color=clr)
+        _data_cell(ws, i, 3, round(daily, 2),  num_fmt="0.00", bold=True, color=C_PURPLE)
+        _data_cell(ws, i, 4, unit, color=C_MUTED)
+        nc = ws.cell(row=i, column=5, value=note)
+        nc.font = _font(color=C_MUTED, size=10, italic=True)
+        nc.alignment = _left(); nc.border = _border_thin()
+
+    # ── Per-hour breakdown ────────────────────────────────────────────────────
+    ws.row_dimensions[9].height = 22
+    for col, hdr in enumerate(
+            ["Hour", "Intervals", "Total AUC (mg/dL·hr)",
+             "Hyper AUC (>180)", "Hypo AUC (<70)", "Hyper Zone"], 1):
+        _header_cell(ws, 9, col, hdr,
+                     bg=C_ACCENT if col < 3 else (C_TAR1 if col == 4 else (C_TBR1 if col == 5 else C_ACCENT)))
+
+    max_hyper = max((h["hyper"] for h in auc_hourly), default=1) or 1
+
+    for i, h in enumerate(auc_hourly, 10):
+        ws.row_dimensions[i].height = 18
+        hyper_pct = h["hyper"] / max_hyper  # relative intensity 0–1
+        # gradient: white → amber
+        r_val = int(255)
+        g_val = int(255 - 100 * hyper_pct)
+        b_val = int(255 - 200 * hyper_pct)
+        hyper_bg = f"{r_val:02X}{max(g_val,0):02X}{max(b_val,0):02X}" if h["hyper"] > 0 else "FFFFFF"
+
+        _data_cell(ws, i, 1, h["label"], bold=True, color=C_ACCENT)
+        _data_cell(ws, i, 2, h["intervals"])
+        _data_cell(ws, i, 3, round(h["total"], 2) if h["total"] else "—", num_fmt="0.00")
+        _data_cell(ws, i, 4, round(h["hyper"], 2) if h["hyper"] else "—",
+                   num_fmt="0.00", bold=h["hyper"] > 0,
+                   color=C_TAR1 if h["hyper"] > 0 else C_MUTED, bg=hyper_bg)
+        _data_cell(ws, i, 5, round(h["hypo"],  2) if h["hypo"]  else "—",
+                   num_fmt="0.00", bold=h["hypo"] > 0,
+                   color=C_TBR1 if h["hypo"] > 0 else C_MUTED)
+        # Hyper zone label
+        pct = h["hyper"] / (h["total"] or 1) * 100
+        zone = ("None" if h["hyper"] == 0 else
+                "Low"  if pct < 10 else
+                "Moderate" if pct < 30 else "High")
+        zone_color = C_GREEN if zone == "None" else (C_AMBER if zone != "High" else C_RED)
+        _data_cell(ws, i, 6, zone, color=zone_color, bold=(zone == "High"))
+
+    # Column widths
+    for col, w in enumerate([10, 10, 24, 20, 18, 14], 1):
+        _set_col_width(ws, col, w)
+
+    # Footnote
+    fn_row = 35
+    ws.merge_cells(f"A{fn_row}:F{fn_row}")
+    fn = ws.cell(row=fn_row, column=1,
+                 value="Hyper Zone %: proportion of the hour's total AUC that lies above 180 mg/dL. "
+                       "High = >30%. Colour intensity in column D scales with peak-normalised hyper AUC.")
+    fn.font = _font(size=9, color=C_MUTED, italic=True); fn.alignment = _left()
+
+
 # ─── Main entry point ─────────────────────────────────────────────────────────
 
 def generate_workbook(csv_path: str, out_path: str, subject_name: str = ""):
@@ -650,15 +829,18 @@ def generate_workbook(csv_path: str, out_path: str, subject_name: str = ""):
     if not subject_name:
         subject_name = os.path.splitext(os.path.basename(csv_path))[0]
 
-    summary    = calc_summary(readings)
-    daily      = calc_daily(readings)
-    agp        = calc_agp(readings)
-    timeblocks = calc_time_blocks(readings)
+    summary      = calc_summary(readings)
+    auc          = calc_auc(readings)
+    auc_hourly   = calc_auc_hourly(readings)
+    daily        = calc_daily(readings)
+    agp          = calc_agp(readings)
+    timeblocks   = calc_time_blocks(readings)
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)   # remove default sheet
 
-    build_summary_sheet(wb, summary, subject_name)
+    build_summary_sheet(wb, summary, auc, subject_name)
+    build_auc_sheet(wb, auc, auc_hourly)
     build_daily_sheet(wb, daily)
     build_agp_sheet(wb, agp)
     build_timeblock_sheet(wb, timeblocks)
@@ -667,6 +849,7 @@ def generate_workbook(csv_path: str, out_path: str, subject_name: str = ""):
     wb.save(out_path)
     print(f"  Saved: {out_path}")
     _print_summary(summary, subject_name)
+    _print_auc(auc)
 
 
 def _print_summary(s: dict, name: str):
@@ -687,6 +870,17 @@ def _print_summary(s: dict, name: str):
     print(f"  Trend    : {s['trend']}")
     print(f"  Hypos    : {s['hypo_count']} readings <70 mg/dL")
     print(f"{'─'*50}\n")
+
+
+def _print_auc(auc: dict):
+    print(f"  AUC (total)   : {auc['total_auc']:>10.1f} mg/dL·hr  "
+          f"({auc['daily_total']:.1f}/day)")
+    print(f"  AUC (hyper)   : {auc['hyper_auc']:>10.1f} mg/dL·hr  "
+          f"({auc['daily_hyper']:.2f}/day  >180 mg/dL)")
+    print(f"  AUC (hypo)    : {auc['hypo_auc']:>10.1f} mg/dL·hr  "
+          f"({auc['daily_hypo']:.2f}/day  <70 mg/dL)")
+    print(f"  Coverage      : {auc['valid_hours']:.1f} hrs  "
+          f"({auc['n_days']} days,  gaps >1 hr excluded)")
 
 
 def main():
