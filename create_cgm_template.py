@@ -104,8 +104,11 @@ GLU  = f"_Calc!$B${DSTART}:$B${DEND}"
 DATE = f"_Calc!$C${DSTART}:$C${DEND}"
 HOUR = f"_Calc!$D${DSTART}:$D${DEND}"
 MEDS = f"_Calc!$E${DSTART}:$E${DEND}"
-RL   = f"_Calc!$G${DSTART}:$G${DEND}"   # Kovatchev low-risk component → LBGI
-RH   = f"_Calc!$H${DSTART}:$H${DEND}"   # Kovatchev high-risk component → HBGI
+RL        = f"_Calc!$G${DSTART}:$G${DEND}"   # Kovatchev low-risk component → LBGI
+RH        = f"_Calc!$H${DSTART}:$H${DEND}"   # Kovatchev high-risk component → HBGI
+TRAP_AUC   = f"_Calc!$J${DSTART}:$J${DEND}"   # Trapezoidal total AUC contributions
+TRAP_HYPER = f"_Calc!$K${DSTART}:$K${DEND}"   # Trapezoidal AUC > 180 contributions
+TRAP_HYPO  = f"_Calc!$L${DSTART}:$L${DEND}"   # Trapezoidal AUC < 70 contributions
 N    = f"COUNT({GLU})"
 
 MED_START_CELL   = "INPUT!$I$1"
@@ -161,6 +164,15 @@ def hbs_meds(phase):
 
 def pctile_meds(p, phase):
     return f'=IFERROR(PERCENTILE(FILTER({GLU},{MEDS}="{phase}"),{p}),"—")'
+
+def auc_sumif(trap_range, phase):
+    return f'=IFERROR(SUMIF({MEDS},"{phase}",{trap_range}),"—")'
+
+def daily_auc_meds(trap_range, phase):
+    """AUC per phase normalised by unique days in that phase."""
+    days = (f'SUMPRODUCT(({MEDS}="{phase}")'
+            f'*IFERROR(1/COUNTIFS({MEDS},"{phase}",{DATE},{DATE}),0))')
+    return f'=IFERROR(SUMIF({MEDS},"{phase}",{trap_range})/({days}),"—")'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  SHEET BUILDERS
@@ -283,7 +295,8 @@ def build_calc(wb):
 
     for col, hdr in enumerate(
             ["DateTime", "Glucose_Valid", "Date_Serial", "Hour",
-             "Med_Status", "f_val", "rl_lbgi", "rh_hbgi"], 1):
+             "Med_Status", "f_val", "rl_lbgi", "rh_hbgi",
+             "dt_hr", "trap_auc", "trap_hyper", "trap_hypo"], 1):
         ws.cell(row=1, column=col, value=hdr)
 
     print(f"  Writing {NROWS:,} _Calc helper rows…", end="", flush=True)
@@ -304,11 +317,23 @@ def build_calc(wb):
         ws.cell(row=r, column=7, value=f'=IF(F{r}="","",IF(F{r}<0,10*F{r}^2,0))')
         # rh: high-risk component (f > 0 → hyperglycaemia risk)
         ws.cell(row=r, column=8, value=f'=IF(F{r}="","",IF(F{r}>0,10*F{r}^2,0))')
+        # dt_hr: hours elapsed since previous valid reading; "" if first row or gap > 1 hr
+        ws.cell(row=r, column=9, value=(
+            f'=IF(B{r}="","",IF(ROW()<={DSTART},"",IF(B{r-1}="","",IF((A{r}-A{r-1})*24>1,"gap",(A{r}-A{r-1})*24))))'))
+        # trap_auc: trapezoidal total AUC contribution (mg/dL·hr) for this interval
+        ws.cell(row=r, column=10, value=(
+            f'=IF(OR(I{r}="",I{r}="gap"),0,(B{r}+B{r-1})/2*I{r})'))
+        # trap_hyper: trapezoidal AUC above 180 mg/dL
+        ws.cell(row=r, column=11, value=(
+            f'=IF(OR(I{r}="",I{r}="gap"),0,(MAX(0,B{r}-180)+MAX(0,B{r-1}-180))/2*I{r})'))
+        # trap_hypo: trapezoidal AUC below 70 mg/dL
+        ws.cell(row=r, column=12, value=(
+            f'=IF(OR(I{r}="",I{r}="gap"),0,(MAX(0,70-B{r})+MAX(0,70-B{r-1}))/2*I{r})'))
         if r % 5000 == 0:
             print(".", end="", flush=True)
     print(" done")
 
-    for i, w in enumerate([22, 14, 14, 8, 12, 14, 12, 12], 1):
+    for i, w in enumerate([22, 14, 14, 8, 12, 14, 12, 12, 10, 12, 12, 12], 1):
         col_w(ws, i, w)
 
 
@@ -494,6 +519,37 @@ def build_summary(wb):
                f"=IFERROR(COUNTIF({GLU},\">180\")/{N}*100,0)",
                unit="%", val_color=C["amber"], bold_val=True,
                note="All readings above target range. ADA target <25%.")
+    blank()
+
+    # ── AREA UNDER THE CURVE ──────────────────────────────────────────────────
+    section("AREA UNDER THE CURVE  (Trapezoidal Method)", bg=C["purple"])
+    # Total valid hours: sum of dt_hr where dt_hr is a number (excludes gaps)
+    _dt  = f"_Calc!$I${DSTART}:$I${DEND}"
+    _days = f'IFERROR(SUMPRODUCT((1/COUNTIFS({DATE},{DATE},{GLU},"<>"))*({GLU}<>"")),1)'
+    metric_row("Total AUC",
+               f"=IFERROR(SUM({TRAP_AUC}),\"—\")",
+               unit="mg/dL·hr",
+               note="Integral of the glucose-time curve over the entire dataset. "
+                    "Gaps >1 hour between readings are excluded.")
+    metric_row("Hyperglycemic AUC  (>180 mg/dL)",
+               f"=IFERROR(SUM({TRAP_HYPER}),\"—\")",
+               unit="mg/dL·hr", val_color=C["amber"],
+               note="Time-weighted glucose exposure above 180 mg/dL. "
+                    "Captures both frequency and depth of hyperglycaemia.")
+    metric_row("Hypoglycemic AUC  (<70 mg/dL)",
+               f"=IFERROR(SUM({TRAP_HYPO}),\"—\")",
+               unit="mg/dL·hr", val_color=C["red"],
+               note="Time-weighted glucose deficit below 70 mg/dL. "
+                    "Reflects hypoglycaemia severity, not just event count.")
+    metric_row("Daily Hyper AUC  (per calendar day)",
+               f'=IFERROR(SUM({TRAP_HYPER})/({_days}),"—")',
+               unit="mg/dL·hr/day", val_color=C["amber"],
+               note="Hyperglycemic AUC normalised by unique days of data. "
+                    "Enables fair comparison across datasets of different lengths.")
+    metric_row("Daily Hypo AUC  (per calendar day)",
+               f'=IFERROR(SUM({TRAP_HYPO})/({_days}),"—")',
+               unit="mg/dL·hr/day", val_color=C["red"],
+               note="Hypoglycemic AUC normalised by unique days of data.")
 
 
 def build_comparative_summary(wb):
@@ -685,6 +741,39 @@ def build_comparative_summary(wb):
     ]
     for label, f_off, f_on, note in tir_tiers:
         mrow(label, f_off, f_on, unit="%", note=note)
+    blank()
+
+    # ── AREA UNDER THE CURVE ──────────────────────────────────────────────────
+    section("AREA UNDER THE CURVE  (Trapezoidal — mg/dL·hr)", bg=C["purple"])
+    col_hdrs()
+    mrow("Total AUC",
+         auc_sumif(TRAP_AUC,   "Off Meds"),
+         auc_sumif(TRAP_AUC,   "On Meds"),
+         unit="mg/dL·hr",
+         note="Integral of the glucose-time curve per phase. Gaps >1 hr excluded.")
+    mrow("Hyperglycemic AUC  (>180 mg/dL)",
+         auc_sumif(TRAP_HYPER, "Off Meds"),
+         auc_sumif(TRAP_HYPER, "On Meds"),
+         unit="mg/dL·hr", off_color=C["tar1"], on_color=C["tar1"],
+         note="Time-weighted exposure above 180 mg/dL. More sensitive than TAR% — "
+              "captures both how often AND how high. Large negative Δ confirms metformin efficacy.")
+    mrow("Hypoglycemic AUC  (<70 mg/dL)",
+         auc_sumif(TRAP_HYPO,  "Off Meds"),
+         auc_sumif(TRAP_HYPO,  "On Meds"),
+         unit="mg/dL·hr", off_color=C["red"], on_color=C["red"],
+         note="Time-weighted deficit below 70 mg/dL. Monitor: an increase on meds "
+              "could indicate over-treatment risk if combined with other agents.")
+    mrow("Daily Hyper AUC  (per day, normalised)",
+         daily_auc_meds(TRAP_HYPER, "Off Meds"),
+         daily_auc_meds(TRAP_HYPER, "On Meds"),
+         unit="mg/dL·hr/day", off_color=C["tar1"], on_color=C["tar1"],
+         note="Hyperglycemic AUC ÷ unique days per phase. Corrects for unequal phase durations — "
+              "use this column, not Total AUC, for the primary treatment-effect comparison.")
+    mrow("Daily Hypo AUC  (per day, normalised)",
+         daily_auc_meds(TRAP_HYPO,  "Off Meds"),
+         daily_auc_meds(TRAP_HYPO,  "On Meds"),
+         unit="mg/dL·hr/day", off_color=C["red"], on_color=C["red"],
+         note="Hypoglycemic AUC ÷ unique days per phase.")
     blank()
 
     # ── GLUCOSE DISTRIBUTION — PERCENTILES ───────────────────────────────────
@@ -1260,6 +1349,52 @@ def build_glossary(wb):
          "(glycogenolysis) and newly synthesised glucose (gluconeogenesis). HGO is the dominant "
          "driver of fasting and nocturnal glucose in T2D. Metformin's primary action is to reduce HGO "
          "by activating AMPK in hepatocytes.",
+         "")
+
+    # ── AREA UNDER THE CURVE ─────────────────────────────────────────────────
+    section("AREA UNDER THE CURVE  (AUC)", bg=C["purple"])
+    term("AUC",
+         "Area Under the Glucose-Time Curve",
+         "The integral of the glucose concentration over time, computed using the trapezoidal "
+         "rule: each consecutive pair of readings contributes ½ × (g1 + g2) × Δt hours. "
+         "Provides a single number representing total glucose exposure. Intervals with gaps "
+         ">1 hour between readings are excluded to avoid artefacts from sensor downtime.",
+         "Units: mg/dL·hr")
+    term("Hyper AUC",
+         "Hyperglycemic AUC  (>180 mg/dL)",
+         "The area of the glucose-time curve that lies above the 180 mg/dL threshold. "
+         "Formula per interval: ½ × (max(0,g1−180) + max(0,g2−180)) × Δt. "
+         "Captures both the frequency and depth of hyperglycaemia in a single number. "
+         "Preferred over TAR% when comparing treatment periods because TAR% is insensitive "
+         "to the severity of excursions — two readings at 350 mg/dL score the same as two "
+         "readings at 185 mg/dL in TAR%, but not in Hyper AUC.",
+         "Lower is better")
+    term("Hypo AUC",
+         "Hypoglycemic AUC  (<70 mg/dL)",
+         "The area of the glucose-time curve that lies below the 70 mg/dL threshold. "
+         "Formula per interval: ½ × (max(0,70−g1) + max(0,70−g2)) × Δt. "
+         "Reflects both how long and how deep hypoglycaemia episodes are.",
+         "Lower is better; target 0")
+    term("Daily AUC",
+         "AUC Normalised per Calendar Day",
+         "Total AUC for a phase divided by the number of unique calendar days in that phase. "
+         "Critical for comparing Off Meds vs On Meds periods that have different durations — "
+         "the Off Meds period is often longer (full baseline) than the On Meds period "
+         "(limited monitoring window), so raw totals are not directly comparable.",
+         "Use for primary comparison")
+    term("Trapezoidal Rule",
+         "Numerical Integration Method",
+         "The standard algorithm for computing AUC from discrete time-series data. "
+         "Each pair of consecutive readings (t1,g1) and (t2,g2) contributes a trapezoid "
+         "of area = (g1+g2)/2 × (t2−t1). More accurate than the rectangle method for "
+         "CGM data because it accounts for the linear interpolation between readings.",
+         "")
+    term("Gap Exclusion",
+         "Sensor Gap Threshold (>1 hour)",
+         "Intervals between consecutive readings longer than 1 hour are excluded from all "
+         "AUC calculations. This prevents large artefactual AUC contributions from periods "
+         "when the sensor was off, charging, or experiencing signal loss. "
+         "The 1-hour threshold works for both 5-minute and 15-minute CGM devices.",
          "")
 
     # ── STATISTICAL METHODS ───────────────────────────────────────────────────
